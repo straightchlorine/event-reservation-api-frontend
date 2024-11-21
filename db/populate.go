@@ -12,7 +12,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// TODO: refactor already existing code
+// TODO: refactor already existing code, and use the models
 
 // Populate the database with fake user records.
 func populateUsers(ctx context.Context, pool *pgxpool.Pool) error {
