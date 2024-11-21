@@ -27,18 +27,14 @@ type User struct {
 	IsActive     bool       `json:"is_active"`
 }
 
-// Represents the user authentication log
+// UserAuthLog represents the user authentication log
 type UserAuthLog struct {
 	ID           int        `json:"id"`
-	Name         string     `json:"name"`
-	Surname      string     `json:"surname"`
-	Username     string     `json:"username"`
-	Email        string     `json:"email"`
-	LastLogin    *time.Time `json:"last_login,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
-	PasswordHash string     `json:"-"`
-	RoleID       int        `json:"role_id"`
-	IsActive     bool       `json:"is_active"`
+	UserID       int        `json:"user_id"`
+	LoginTime    time.Time  `json:"login_time"`
+	IPAddress    string     `json:"ip_address"`
+	UserAgent    string     `json:"user_agent"`
+	LoginStatus  bool       `json:"login_status"`
 }
 
 // Location represents event venues
@@ -65,23 +61,14 @@ type ReservationStatus struct {
 	Name string `json:"name"`
 }
 
-// GroupOrder represents a group ticket order
-type GroupOrder struct {
+// Reservation represents an order of at least one ticket
+type Reservation struct {
 	ID            uuid.UUID `json:"id"`
 	PrimaryUserID int       `json:"primary_user_id"`
 	EventID       int       `json:"event_id"`
 	CreatedAt     time.Time `json:"created_at"`
 	TotalTickets  int       `json:"total_tickets"`
 	StatusID      int       `json:"status_id"`
-}
-
-// GroupOrderParticipant represents individual participants in a group order
-type GroupOrderParticipant struct {
-	ID           int       `json:"id"`
-	GroupOrderID uuid.UUID `json:"group_order_id"`
-	UserID       *int      `json:"user_id,omitempty"`
-	Name         string    `json:"name"`
-	Email        string    `json:"email"`
 }
 
 // TicketType represents different types of tickets
@@ -102,8 +89,7 @@ type TicketStatus struct {
 type Ticket struct {
 	ID                 int       `json:"id"`
 	EventID            int       `json:"event_id"`
-	GroupOrderID       uuid.UUID `json:"group_order_id"`
-	GroupParticipantID int       `json:"group_participant_id"`
+	ReservationID      uuid.UUID `json:"group_order_id"`
 	Price              float64   `json:"price"`
 	TypeID             int       `json:"type_id"`
 	StatusID           int       `json:"status_id"`
