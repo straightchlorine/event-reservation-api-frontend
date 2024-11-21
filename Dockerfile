@@ -1,19 +1,18 @@
 # get the golang
-FROM golang:1.21-alpine
+FROM golang
 
 # set working directory
-WORKDIR /api
+WORKDIR /usr/src/event-api
 
 # copy the module files
 COPY go.mod go.sum ./
-RUN go mod download
+RUN go mod download && go mod verify
 
 # copy the rest of the application
 COPY . .
 
 # build the application
-RUN go build -o main .
-
+RUN go build -v -o /usr/local/bin/event-api .
 
 EXPOSE 8080
-CMD ["./main"]
+CMD ["event-api", "--populate"]

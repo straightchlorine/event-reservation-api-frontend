@@ -7,25 +7,32 @@ services:
     hostname: database
     ports:
       - "${DB_PORT}:${DB_PORT}"
-    # volumes:
-    #   - db-data:/var/lib/postgresql/data
+    volumes:
+      # - db-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
+      NC_USER: ${NC_DB_USER}
+      NC_PASSWORD: ${NC_DB_PASSWORD}
+      NC_NAME: ${NC_DB_NAME}
   nocodb:
     image: nocodb/nocodb
+    container_name: nocodb-dashboard
     ports:
-      - "8080:8080"
+      - "8081:8081"
     # volumes:
     #   - nocodb-data:/usr/app/data/
     environment:
-      - NC_DB=pg://${DB_HOST}:${DB_PORT}?u=${DB_USER}&p=${DB_PASSWORD}&d=${DB_NAME}
+      - NC_DB=pg://${DB_HOST}:${DB_PORT}?u=${NC_DB_USER}&p=${NC_DB_PASSWORD}&d=${NC_DB_NAME}
       - NC_AUTH_JWT_SECRET=569a1821-0a93-45e8-87ab-eb857f20a010
+      - PORT=8081
     restart: always
     depends_on:
       - db
-  sports-api:
+  event-api:
+    container_name: event-api
     build:
       context: .
       dockerfile: Dockerfile
@@ -36,6 +43,6 @@ services:
       - db
     ports:
       - "8080:8080"
-volumes:
-  db-data:
-  nocodb-data:
+# volumes:
+#   db-data:
+#   nocodb-data:
