@@ -148,15 +148,6 @@ CREATE TABLE Tickets (
   CONSTRAINT fk_ticket_status FOREIGN KEY (status_id) REFERENCES TicketStatuses (id) ON DELETE CASCADE
 );
 
--- Mapping Reservations to Tickets in a one-to-many relationship
-CREATE TABLE ReservationsTickets (
-  order_id UUID,
-  ticket_id INT,
-  PRIMARY KEY (order_id, ticket_id),
-  CONSTRAINT fk_order_ticket_order FOREIGN KEY (order_id) REFERENCES Reservations (id) ON DELETE CASCADE,
-  CONSTRAINT fk_order_ticket_ticket FOREIGN KEY (ticket_id) REFERENCES Tickets (id) ON DELETE CASCADE
-);
-
 -- Payment Statuses
 CREATE TABLE PaymentStatuses (
   id SERIAL PRIMARY KEY,
