@@ -39,6 +39,8 @@ services:
     restart: always
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
+      NC_AUTH_JWT_SECRET: 569a1821-0a93-45e8-87ab-eb857f20a010
+      ROOT_PASSWORD: root
     depends_on:
       - db
     ports:

@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"os"
 	"strings"
 	"time"
 
@@ -124,11 +125,49 @@ func populateUsers(ctx context.Context, pool *pgxpool.Pool) error {
 			users[i].PasswordHash, users[i].RoleID, users[i].IsActive)
 	}
 
+	// TODO: add some control so it always is created
+	addAdminUser(batch, fake)
 	// send the batch
 	br := pool.SendBatch(ctx, batch)
 	defer br.Close()
 
 	// return nil if no errors
+	return nil
+}
+
+func addAdminUser(batch *pgx.Batch, fake *gofakeit.Faker) error {
+	// fake password, and its hash
+	password := os.Getenv("ROOT_PASSWORD")
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	// fill the struct
+	root_user := models.User{
+		Name:         "Root",
+		Surname:      "Root",
+		Username:     "root",
+		Email:        "root@root.rt",
+		LastLogin:    fake.PastDate(),
+		CreatedAt:    fake.PastDate(),
+		PasswordHash: string(passwordHash),
+		RoleID:       3, // admin role
+		IsActive:     true,
+	}
+
+	// fill the batch with requests
+	batch.Queue(`
+			INSERT INTO Users (name, surname, username,
+                         email, last_login, created_at,
+                         password_hash, role_id, is_active)
+			VALUES ($1, $2, $3,
+              $4, $5, $6,
+              $7, $8, $9)
+		`, root_user.Name, root_user.Surname, root_user.Username,
+		root_user.Email, root_user.LastLogin, root_user.CreatedAt,
+		root_user.PasswordHash, root_user.RoleID, root_user.IsActive)
+
 	return nil
 }
 
