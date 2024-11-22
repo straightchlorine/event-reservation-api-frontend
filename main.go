@@ -24,19 +24,28 @@ Populate the database with initial data if the populate flag is set.
 */
 func populateDatabase(populateFlag *bool, pool *pgxpool.Pool) {
 	if *populateFlag {
-		fmt.Println("Populating the database...")
+		// if the flag is provided...
+		fmt.Println("Populating the database with fake data and adding admin user...")
 		err := db.PopulateDatabase(pool)
 		if err != nil {
 			log.Fatalf("Failed to populate the database: %v\n", err)
 		}
 		fmt.Println("Database populated successfully.")
+
+	} else {
+		// if the flag is not provided...
+		fmt.Println("Skipping database population, adding only admin user...")
+		err := db.AddAdminUser(nil, nil, pool)
+		if err != nil {
+			log.Fatalf("Failed to populate the database: %v\n", err)
+		}
+
 	}
 }
 
 // Main function
 // Handles populating the database and exposing the API routes.
 func main() {
-
 	// Initialize the JWT secret.
 	jwtSecret := auth.InitJWTSecret()
 
