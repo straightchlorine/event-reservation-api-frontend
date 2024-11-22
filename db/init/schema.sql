@@ -22,7 +22,7 @@ DROP TABLE IF EXISTS PaymentStatuses CASCADE;
 
 DROP TABLE IF EXISTS TicketStatuses CASCADE;
 
-DROP TABLE IF EXISTS TicketType CASCADE;
+DROP TABLE IF EXISTS TicketTypes CASCADE;
 
 DROP TABLE IF EXISTS Events CASCADE;
 
@@ -119,7 +119,7 @@ CREATE TABLE Reservations (
 );
 
 -- Ticket Types
-CREATE TABLE TicketType (
+CREATE TABLE TicketTypes (
   id SERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   discount DECIMAL(5, 2) NOT NULL CHECK (discount BETWEEN 0 AND 1),
@@ -137,14 +137,13 @@ CREATE TABLE Tickets (
   id SERIAL PRIMARY KEY,
   event_id INT NOT NULL,
   reservation_id UUID,
-  group_participant_id INT,
   price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
   type_id INT NOT NULL,
   status_id INT NOT NULL,
   seat_number VARCHAR(20),
   CONSTRAINT fk_ticket_event FOREIGN KEY (event_id) REFERENCES Events (id) ON DELETE CASCADE,
   CONSTRAINT fk_ticket_group_order FOREIGN KEY (reservation_id) REFERENCES Reservations (id) ON DELETE CASCADE,
-  CONSTRAINT fk_ticket_type FOREIGN KEY (type_id) REFERENCES TicketType (id) ON DELETE CASCADE,
+  CONSTRAINT fk_ticket_type FOREIGN KEY (type_id) REFERENCES TicketTypes (id) ON DELETE CASCADE,
   CONSTRAINT fk_ticket_status FOREIGN KEY (status_id) REFERENCES TicketStatuses (id) ON DELETE CASCADE
 );
 
@@ -271,8 +270,8 @@ VALUES
 
 -- Initial Ticket Types
 INSERT INTO
-  TicketType (name, discount, description)
+  TicketTypes (name, discount, description)
 VALUES
-  populateTicketTypes (pool, ctx) ('Standard', 0.00, 'Regular price ticket'),
+  ('Standard', 0.00, 'Regular price ticket'),
   ('Student', 0.20, '20% discount for students'),
   ('Senior', 0.15, '15% discount for seniors');

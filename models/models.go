@@ -15,26 +15,26 @@ type Role struct {
 
 // User represents the user account information
 type User struct {
-	ID           int        `json:"id"`
-	Name         string     `json:"name"`
-	Surname      string     `json:"surname"`
-	Username     string     `json:"username"`
-	Email        string     `json:"email"`
-	LastLogin    *time.Time `json:"last_login,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
-	PasswordHash string     `json:"-"`
-	RoleID       int        `json:"role_id"`
-	IsActive     bool       `json:"is_active"`
+	ID           int       `json:"id"`
+	Name         string    `json:"name"`
+	Surname      string    `json:"surname"`
+	Username     string    `json:"username"`
+	Email        string    `json:"email"`
+	LastLogin    time.Time `json:"last_login,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	PasswordHash string    `json:"-"`
+	RoleID       int       `json:"role_id"`
+	IsActive     bool      `json:"is_active"`
 }
 
 // UserAuthLog represents the user authentication log
 type UserAuthLog struct {
-	ID           int        `json:"id"`
-	UserID       int        `json:"user_id"`
-	LoginTime    time.Time  `json:"login_time"`
-	IPAddress    string     `json:"ip_address"`
-	UserAgent    string     `json:"user_agent"`
-	LoginStatus  bool       `json:"login_status"`
+	ID          int       `json:"id"`
+	UserID      int       `json:"user_id"`
+	LoginTime   time.Time `json:"login_time"`
+	IPAddress   string    `json:"ip_address"`
+	UserAgent   string    `json:"user_agent"`
+	LoginStatus bool      `json:"login_status"`
 }
 
 // Location represents event venues
@@ -87,13 +87,13 @@ type TicketStatus struct {
 
 // Ticket represents an individual ticket
 type Ticket struct {
-	ID                 int       `json:"id"`
-	EventID            int       `json:"event_id"`
-	ReservationID      uuid.UUID `json:"group_order_id"`
-	Price              float64   `json:"price"`
-	TypeID             int       `json:"type_id"`
-	StatusID           int       `json:"status_id"`
-	SeatNumber         string    `json:"seat_number,omitempty"`
+	ID            int       `json:"id"`
+	EventID       int       `json:"event_id"`
+	ReservationID uuid.UUID `json:"reservation_id"`
+	Price         float64   `json:"price"`
+	TypeID        int       `json:"type_id"`
+	StatusID      int       `json:"status_id"`
+	SeatNumber    string    `json:"seat_number,omitempty"`
 }
 
 // PaymentStatus represents different states of a payment
@@ -102,10 +102,10 @@ type PaymentStatus struct {
 	Name string `json:"name"`
 }
 
-// Payment represents a payment for a group order
+// Payment represents a payment for a reservation
 type Payment struct {
 	ID           int       `json:"id"`
-	GroupOrderID uuid.UUID `json:"group_order_id"`
+	GroupOrderID uuid.UUID `json:"reservation_id"`
 	StatusID     int       `json:"status_id"`
 	TotalAmount  float64   `json:"total_amount"`
 	PaymentDate  time.Time `json:"payment_date"`

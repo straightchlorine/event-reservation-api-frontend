@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"event-reservation-api/models"
+
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -12,41 +14,82 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// TODO: refactor already existing code, and use the models
+/*
+Fetch the IDs of existing records from given table.
+
+	Arguments:
+	  ctx: context
+	  pool: database connection pool
+	  table: table name
+
+	Returns:
+	  []int: list of integer IDs
+*/
+func fetchIds(ctx context.Context, pool *pgxpool.Pool, table string) []int {
+	// fetch the ids from the table
+	rows, err := pool.Query(ctx, "SELECT id FROM "+table)
+	if err != nil {
+		return []int{}
+	}
+	defer rows.Close()
+
+	// build the list of ids
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return []int{}
+		}
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+/*
+Fetch the IDs of existing records from given table.
+
+	Arguments:
+	  ctx: context
+	  pool: database connection pool
+	  table: table name
+
+	Returns:
+	  []uuid.UUID: list of UUIDs
+*/
+func fetchUUIDIds(ctx context.Context, pool *pgxpool.Pool, table string) []uuid.UUID {
+	// fetch the ids from the table
+	rows, err := pool.Query(ctx, "SELECT id FROM "+table)
+	if err != nil {
+		return []uuid.UUID{}
+	}
+	defer rows.Close()
+
+	// build the list of ids
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return []uuid.UUID{}
+		}
+		ids = append(ids, id)
+	}
+	return ids
+}
 
 // Populate the database with fake user records.
 func populateUsers(ctx context.Context, pool *pgxpool.Pool) error {
 	fake := gofakeit.New(0)
 
-	// get existing role ids
-	rows, err := pool.Query(ctx, "SELECT id FROM Roles")
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	// build the list of role ids
-	var roleIDs []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			return err
-		}
-		roleIDs = append(roleIDs, id)
-	}
-
 	// user struct
-	users := make([]struct {
-		Username     string
-		Email        string
-		Name         string
-		Surname      string
-		RoleID       int
-		PasswordHash []byte
-	}, 20)
+	users := make([]models.User, 40)
+
+	// role struct
+	roleIDs := fetchIds(ctx, pool, "Roles")
+
+	// batch insert
+	batch := &pgx.Batch{}
 
 	// fill the struct with fake data
-	batch := &pgx.Batch{}
 	for i := range users {
 		// fake password, and its hash
 		password := fake.Password(true, true, true, true, false, 12)
@@ -56,28 +99,29 @@ func populateUsers(ctx context.Context, pool *pgxpool.Pool) error {
 		}
 
 		// fill the struct
-		users[i] = struct {
-			Username     string
-			Email        string
-			Name         string
-			Surname      string
-			RoleID       int
-			PasswordHash []byte
-		}{
-			Username:     fake.Username(),
-			Email:        fake.Email(),
+		users[i] = models.User{
 			Name:         fake.FirstName(),
 			Surname:      fake.LastName(),
+			Username:     fake.Username(),
+			Email:        fake.Email(),
+			LastLogin:    fake.PastDate(),
+			CreatedAt:    fake.PastDate(),
+			PasswordHash: string(passwordHash),
 			RoleID:       roleIDs[i%len(roleIDs)],
-			PasswordHash: passwordHash,
+			IsActive:     fake.Bool(),
 		}
 
-		// insert into database via pgx.Batch for bulk insert
+		// fill the batch with requests
 		batch.Queue(`
-			INSERT INTO Users (username, email, password_hash, name, surname, role_id, is_active, email_verified)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		`, users[i].Username, users[i].Email, users[i].PasswordHash,
-			users[i].Name, users[i].Surname, users[i].RoleID, true, true)
+			INSERT INTO Users (name, surname, username,
+                         email, last_login, created_at,
+                         password_hash, role_id, is_active)
+			VALUES ($1, $2, $3,
+              $4, $5, $6,
+              $7, $8, $9)
+		`, users[i].Name, users[i].Surname, users[i].Username,
+			users[i].Email, users[i].LastLogin, users[i].CreatedAt,
+			users[i].PasswordHash, users[i].RoleID, users[i].IsActive)
 	}
 
 	// send the batch
@@ -92,96 +136,27 @@ func populateUsers(ctx context.Context, pool *pgxpool.Pool) error {
 func populateLocations(ctx context.Context, pool *pgxpool.Pool) error {
 	fake := gofakeit.New(0)
 
-	// location struct
-	locations := make([]struct {
-		Stadium  string
-		Address  string
-		Country  string
-		Capacity int
-	}, 5)
+	// locations struct
+	locations := make([]models.Location, 20)
+
+	// batch insert
+	batch := &pgx.Batch{}
 
 	// fill the struct with fake data
 	for i := range locations {
 		fake_stadium := fake.NounCollectiveThing()
-		locations[i] = struct {
-			Stadium  string
-			Address  string
-			Country  string
-			Capacity int
-		}{
+
+		locations[i] = models.Location{
 			Stadium:  strings.ToUpper(string(fake_stadium[0])) + fake_stadium[1:],
 			Address:  fake.Address().Address,
 			Country:  fake.Country(),
 			Capacity: fake.Number(5000, 80000),
 		}
-	}
 
-	// insert into database via pgx.Batch for bulk insert
-	batch := &pgx.Batch{}
-	for _, loc := range locations {
 		batch.Queue(`
-			INSERT INTO Locations (stadium, address, country, capacity)
-			VALUES ($1, $2, $3, $4)
-		`, loc.Stadium, loc.Address, loc.Country, loc.Capacity)
-	}
-
-	// send the batch
-	br := pool.SendBatch(ctx, batch)
-	defer br.Close()
-	return nil
-}
-
-// Populate the database with fake event records.
-func populateEvents(ctx context.Context, pool *pgxpool.Pool) error {
-	fake := gofakeit.New(0)
-
-	// get existing location ids
-	rows, err := pool.Query(ctx, "SELECT id FROM Locations")
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	// build the list of location ids
-	var locationIDs []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			return err
-		}
-		locationIDs = append(locationIDs, id)
-	}
-
-	// event struct
-	events := make([]struct {
-		Name             string
-		Date             time.Time
-		LocationID       int
-		AvailableTickets int
-	}, 10)
-
-	// fill the struct with fake data
-	for i := range events {
-		events[i] = struct {
-			Name             string
-			Date             time.Time
-			LocationID       int
-			AvailableTickets int
-		}{
-			Name:             fake.Country() + "-" + fake.Country(),
-			Date:             fake.FutureDate(),
-			LocationID:       locationIDs[i%len(locationIDs)],
-			AvailableTickets: fake.Number(1000, 50000),
-		}
-	}
-
-	// insert into database via pgx.Batch for bulk insert
-	batch := &pgx.Batch{}
-	for _, event := range events {
-		batch.Queue(`
-			INSERT INTO Events (name, date, location_id, available_tickets)
-			VALUES ($1, $2, $3, $4)
-		`, event.Name, event.Date, event.LocationID, event.AvailableTickets)
+      INSERT INTO Locations (stadium, address, country, capacity)
+      VALUES ($1, $2, $3, $4)
+    `, locations[i].Stadium, locations[i].Address, locations[i].Country, locations[i].Capacity)
 	}
 
 	// send the batch
@@ -192,153 +167,162 @@ func populateEvents(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
-// TODO: append additional methods as they will be written.
-// Populate the database with fake group orders.
-func populateGroupOrders(ctx context.Context, pool *pgxpool.Pool) error {
+// Populate the database with fake event records.
+func populateEvents(ctx context.Context, pool *pgxpool.Pool) error {
 	fake := gofakeit.New(0)
 
-	var userIDs, eventIDs, statusIDs []int
+	// get existing location ids
+	locationIDs := fetchIds(ctx, pool, "Locations")
+
+	// event struct
+	events := make([]models.Event, 20)
+
+	// batch insert
+	batch := &pgx.Batch{}
+
+	// fill the struct with fake data
+	for i := range events {
+		events[i] = models.Event{
+			Name:             fake.Country() + "-" + fake.Country(),
+			Date:             fake.FutureDate(),
+			LocationID:       locationIDs[i%len(locationIDs)],
+			AvailableTickets: fake.Number(1000, 50000),
+		}
+
+		// fill the batch with requests
+		batch.Queue(`
+				INSERT INTO Events (name, date, location_id, available_tickets)
+				VALUES ($1, $2, $3, $4)
+			`, events[i].Name, events[i].Date, events[i].LocationID, events[i].AvailableTickets)
+	}
+
+	// send the batch
+	br := pool.SendBatch(ctx, batch)
+	defer br.Close()
+
+	// return nil if no errors
+	return nil
+}
+
+// Populate the database with fake reservations.
+func populateReservations(ctx context.Context, pool *pgxpool.Pool) error {
+	fake := gofakeit.New(0)
 
 	// fetch user ids
-	userRows, err := pool.Query(ctx, "SELECT id FROM Users")
-	if err != nil {
-		return err
-	}
-	defer userRows.Close()
-
-	// build the list of user ids
-	for userRows.Next() {
-		var id int
-		if err := userRows.Scan(&id); err != nil {
-			return err
-		}
-		userIDs = append(userIDs, id)
-	}
+	userIDs := fetchIds(ctx, pool, "Users")
 
 	// fetch event ids
-	eventRows, err := pool.Query(ctx, "SELECT id FROM Events")
-	if err != nil {
-		return err
-	}
-	defer eventRows.Close()
+	eventIDs := fetchIds(ctx, pool, "Events")
 
-	// build the list of event ids
-	for eventRows.Next() {
-		var id int
-		if err := eventRows.Scan(&id); err != nil {
-			return err
-		}
-		eventIDs = append(eventIDs, id)
-	}
+	// fetch status ids
+	statusIDs := fetchIds(ctx, pool, "ReservationStatuses")
 
-	// fetch the reservation statuses
-	statusRows, err := pool.Query(ctx, "SELECT id FROM ReservationStatuses")
-	if err != nil {
-		return err
-	}
-	defer statusRows.Close()
+	// reservation struct
+	reservations := make([]models.Reservation, 100)
 
-	// bild the list of status ids
-	for statusRows.Next() {
-		var id int
-		if err := statusRows.Scan(&id); err != nil {
-			return err
-		}
-		statusIDs = append(statusIDs, id)
-	}
-
-	groupOrders := make([]struct {
-		PrimaryUserID int
-		EventID       int
-		TotalTickets  int
-		StatusID      int
-	}, 15)
-
+	// batch insert
 	batch := &pgx.Batch{}
-	for i := range groupOrders {
-		groupOrders[i] = struct {
-			PrimaryUserID int
-			EventID       int
-			TotalTickets  int
-			StatusID      int
-		}{
+
+	// fill the struct with fake data
+	for i := range reservations {
+
+		// fill the struct
+		reservations[i] = models.Reservation{
 			PrimaryUserID: userIDs[i%len(userIDs)],
 			EventID:       eventIDs[i%len(eventIDs)],
+			CreatedAt:     fake.PastDate(),
 			TotalTickets:  fake.Number(1, 10),
 			StatusID:      statusIDs[i%len(statusIDs)],
 		}
 
-		groupOrderID := uuid.New()
-		batch.Queue(`
-			INSERT INTO GroupOrders (id, primary_user_id, event_id, total_tickets, status_id)
-			VALUES ($1, $2, $3, $4, $5)
-		`, groupOrderID, groupOrders[i].PrimaryUserID,
-			groupOrders[i].EventID, groupOrders[i].TotalTickets, groupOrders[i].StatusID)
+		reservation_id := uuid.New()
 
-		// Add group order participants
-		participantCount := groupOrders[i].TotalTickets
-		for j := 0; j < participantCount; j++ {
-			batch.Queue(`
-				INSERT INTO GroupOrderParticipants (group_order_id, name, email)
-				VALUES ($1, $2, $3)
-			`, groupOrderID, fake.Name(), fake.Email())
-		}
+		// fill the batch with requests
+		batch.Queue(`
+        INSERT INTO Reservations (id, primary_user_id, event_id, created_at, total_tickets, status_id)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, reservation_id, reservations[i].PrimaryUserID, reservations[i].EventID,
+			reservations[i].CreatedAt, reservations[i].TotalTickets, reservations[i].StatusID)
+
 	}
 
+	// send the batch
 	br := pool.SendBatch(ctx, batch)
 	defer br.Close()
+
+	// return nil if no errors
 	return nil
 }
 
-// Fetch the ID fields from Event table.
-func fetchEventIds(pool *pgxpool.Pool) []int {
-
-	// list placeholder
-	var eventIDs []int
-
-	// fetch event ids
-	eventRows, err := pool.Query(ctx, "SELECT id FROM Events")
-	if err != nil {
-		return err
-	}
-	defer eventRows.Close()
-
-	// build the list of event ids
-	for eventRows.Next() {
-		var id int
-		if err := eventRows.Scan(&id); err != nil {
-			return err
-		}
-		eventIDs = append(eventIDs, id)
-	}
-
-	return eventIDs
-}
-
-// TODO: finish implementation
+// Populate the database with fake tickets.
 func populateTickets(ctx context.Context, pool *pgxpool.Pool) error {
 	fake := gofakeit.New(0)
 
-	eventIds := fetchEventIds(pool)
+	// ticket struct
+	tickets := make([]models.Ticket, 100)
 
+	//fetch event ids
+	eventIDs := fetchIds(ctx, pool, "Events")
+
+	// fetch reservation ids
+	reservationIDs := fetchUUIDIds(ctx, pool, "Reservations")
+
+	// fetch ticket type ids
+	ticketTypeIDs := fetchIds(ctx, pool, "TicketTypes")
+
+	// fetch ticket status ids
+	ticketStatusIDs := fetchIds(ctx, pool, "TicketStatuses")
+
+	// batch insert
+	batch := &pgx.Batch{}
+
+	// fill the struct with fake data
+	for i := range tickets {
+
+		// fill the struct
+		tickets[i] = models.Ticket{
+			EventID:       eventIDs[i%len(eventIDs)],
+			ReservationID: reservationIDs[i%len(reservationIDs)],
+			Price:         fake.Price(10, 1000),
+			TypeID:        ticketTypeIDs[i%len(ticketTypeIDs)],
+			StatusID:      ticketStatusIDs[i%len(ticketStatusIDs)],
+			SeatNumber:    fake.Word(),
+		}
+
+		// fill the batch with requests
+		batch.Queue(`
+              INSERT INTO Tickets (event_id, reservation_id, price, type_id, status_id, seat_number)
+              VALUES ($1, $2, $3, $4, $5, $6)
+            `, tickets[i].EventID, tickets[i].ReservationID, tickets[i].Price,
+			tickets[i].TypeID, tickets[i].StatusID, tickets[i].SeatNumber)
+	}
+
+	// send the batch
+	br := pool.SendBatch(ctx, batch)
+	defer br.Close()
+
+	// return nil if no errors
 	return nil
+
 }
 
 // Populate the database with fake data.
 func PopulateDatabase(pool *pgxpool.Pool) error {
 
-	// Create a context with a timeout.
+	// conte  // context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	// Population order matters due to foreign key constraints
+	// group the functions in appropriate order
 	populationFuncs := []func(context.Context, *pgxpool.Pool) error{
+		populateUsers,
 		populateLocations,
 		populateEvents,
-		populateUsers,
-		populateGroupOrders,
+		populateReservations,
+		populateTickets,
 	}
 
+	// populate the database
 	for _, populateFunc := range populationFuncs {
 		if err := populateFunc(ctx, pool); err != nil {
 			return err
