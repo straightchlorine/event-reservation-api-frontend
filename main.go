@@ -8,17 +8,40 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"event-reservation-api/auth"
 	"event-reservation-api/db"
 	"event-reservation-api/routes"
 )
+
+/*
+Populate the database with initial data if the populate flag is set.
+
+	Arguments:
+	  populateFlag: A boolean flag indicating whether to populate the database.
+	  pool: A connection pool to the database.
+*/
+func populateDatabase(populateFlag *bool, pool *pgxpool.Pool) {
+	if *populateFlag {
+		fmt.Println("Populating the database...")
+		err := db.PopulateDatabase(pool)
+		if err != nil {
+			log.Fatalf("Failed to populate the database: %v\n", err)
+		}
+		fmt.Println("Database populated successfully.")
+	}
+}
 
 // Main function
 // Handles populating the database and exposing the API routes.
 func main() {
 
-	populateFlag := flag.Bool("populate", false, "Populate the database with initial data.")
+	// Initialize the JWT secret.
+	jwtSecret := auth.InitJWTSecret()
 
 	// Parse the command line flags.
+	populateFlag := flag.Bool("populate", false, "Populate the database with initial data.")
 	flag.Parse()
 
 	// Get the connection pool.
@@ -28,18 +51,11 @@ func main() {
 	}
 	defer pool.Close()
 
-	// If population is set, run the population script.
-	if *populateFlag {
-		fmt.Println("Populating the database...")
-		err = db.PopulateDatabase(pool)
-		if err != nil {
-			log.Fatalf("Failed to populate the database: %v\n", err)
-		}
-		fmt.Println("Database populated successfully.")
-	}
+	// Populate the database if the flag is set.
+	populateDatabase(populateFlag, pool)
 
 	// Set up the API routes.
-	r := routes.SetupRoutes(pool)
+	r := routes.SetupRoutes(pool, jwtSecret)
 
 	// Start the server (defaults to port 8080).
 	port := os.Getenv("PORT")
