@@ -24,5 +24,9 @@ func SetupRoutes(pool *pgxpool.Pool, jwtSecret string) *mux.Router {
 	userRouter.HandleFunc("", handlers.GetUserHandler(pool)).Methods(http.MethodGet)
 	userRouter.HandleFunc("/{id}", handlers.GetUserByIDHandler(pool)).Methods(http.MethodGet)
 
+	userRouter.HandleFunc("/", handlers.CreateUserHandler(pool)).Methods(http.MethodPut)
+	userRouter.HandleFunc("/{id}", handlers.DeleteUserHandler(pool)).Methods(http.MethodDelete)
+	userRouter.HandleFunc("/{id}", handlers.UpdateUserHandler(pool)).Methods(http.MethodPut)
+
 	return r
 }
