@@ -6,14 +6,14 @@ import (
 	"github.com/google/uuid"
 )
 
-// Role represents user roles in the system
+// Role table record
 type Role struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 
-// User represents the user account information
+// User table record
 type User struct {
 	ID           int       `json:"id"`
 	Name         string    `json:"name"`
@@ -27,7 +27,7 @@ type User struct {
 	IsActive     bool      `json:"is_active"`
 }
 
-// UserAuthLog represents the user authentication log
+// UserAuthLog table record
 type UserAuthLog struct {
 	ID          int       `json:"id"`
 	UserID      int       `json:"user_id"`
@@ -37,7 +37,7 @@ type UserAuthLog struct {
 	LoginStatus bool      `json:"login_status"`
 }
 
-// Location represents event venues
+// Location table record
 type Location struct {
 	ID       int    `json:"id"`
 	Stadium  string `json:"stadium"`
@@ -46,7 +46,7 @@ type Location struct {
 	Capacity int    `json:"capacity"`
 }
 
-// Event represents a specific event
+// Event table record
 type Event struct {
 	ID               int       `json:"id"`
 	Name             string    `json:"name"`
@@ -55,13 +55,13 @@ type Event struct {
 	AvailableTickets int       `json:"available_tickets"`
 }
 
-// ReservationStatus represents different states of a reservation
+// ReservationStatus table record
 type ReservationStatus struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
 
-// Reservation represents an order of at least one ticket
+// Reservation table record
 type Reservation struct {
 	ID            uuid.UUID `json:"id"`
 	PrimaryUserID int       `json:"primary_user_id"`
@@ -71,7 +71,7 @@ type Reservation struct {
 	StatusID      int       `json:"status_id"`
 }
 
-// TicketType represents different types of tickets
+// TicketType table record
 type TicketType struct {
 	ID          int     `json:"id"`
 	Name        string  `json:"name"`
@@ -79,13 +79,13 @@ type TicketType struct {
 	Description string  `json:"description"`
 }
 
-// TicketStatus represents different states of a ticket
+// TicketStatus table record
 type TicketStatus struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
 
-// Ticket represents an individual ticket
+// Ticket table record
 type Ticket struct {
 	ID            int       `json:"id"`
 	EventID       int       `json:"event_id"`
@@ -96,13 +96,13 @@ type Ticket struct {
 	SeatNumber    string    `json:"seat_number,omitempty"`
 }
 
-// PaymentStatus represents different states of a payment
+// PaymentStatus table record
 type PaymentStatus struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
 
-// Payment represents a payment for a reservation
+// Payment table record
 type Payment struct {
 	ID           int       `json:"id"`
 	GroupOrderID uuid.UUID `json:"reservation_id"`
@@ -111,7 +111,7 @@ type Payment struct {
 	PaymentDate  time.Time `json:"payment_date"`
 }
 
-// Permission represents system-wide permissions
+// Permission table record
 type Permission struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`
