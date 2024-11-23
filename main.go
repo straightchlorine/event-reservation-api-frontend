@@ -18,9 +18,10 @@ import (
 /*
 Populate the database with initial data if the populate flag is set.
 
-	Arguments:
-	  populateFlag: A boolean flag indicating whether to populate the database.
-	  pool: A connection pool to the database.
+Arguments:
+
+	populateFlag: A boolean flag indicating whether to populate the database.
+	pool: A connection pool to the database.
 */
 func populateDatabase(populateFlag *bool, pool *pgxpool.Pool) {
 	if *populateFlag {

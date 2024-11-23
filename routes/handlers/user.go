@@ -5,55 +5,86 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"event-reservation-api/middlewares"
-	// "event-reservation-api/models"
 )
 
-func fetchRole(pool *pgxpool.Pool, ctx context.Context, id int) string {
-	// Query to fetch the role name by id
-	rows, err := pool.Query(ctx, "SELECT name FROM roles WHERE id=$1", id)
+// FetchRole fetches the role name associated with a given role ID.
+
+/*
+Fetch the role name associated with a given role ID.
+
+Arguments:
+
+	ctx: The request context.
+	pool: A connection pool to the database.
+	roleID: The ID of the role to fetch.
+
+Returns:
+
+	roleName and error (nil if successful).
+*/
+func FetchRole(ctx context.Context, pool *pgxpool.Pool, roleID int) (string, error) {
+	var roleName string
+
+	// fetch the role name by ID
+	query := "SELECT name FROM roles WHERE id = $1"
+	err := pool.QueryRow(ctx, query, roleID).Scan(&roleName)
 	if err != nil {
-		// If there was an error with the query, return an empty string
-		return ""
-	}
-	defer rows.Close()
-
-	// Ensure that at least one row is returned
-	if rows.Next() {
-		var roleName string
-		// Scan the role name into the roleName variable
-		if err := rows.Scan(&roleName); err != nil {
-			// If scanning fails, return an empty string
-			return ""
-		}
-		// Return the role name
-		return roleName
+		return "", err // if the query fails, return error
 	}
 
-	// If no rows were found for the provided id, return an empty string
-	return ""
+	return strings.ToUpper(roleName), nil
 }
 
-// GetUserHandler retrieves all users.
+// GetUserHandler retrieves all users. Only accessible to users with the ADMIN role.
+
+/*
+Retrieve all users.
+
+Available only for admin users.
+
+Arguments:
+
+	pool: A connection pool to the database.
+
+Returns:
+
+	http.HandlerFunc: A function handler for fetching users.
+*/
 func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract claims for role validation
+		// get the claims from the context
 		claims, err := middlewares.GetClaimsFromContext(r.Context())
 		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			http.Error(w, "Unauthorized: Missing or invalid token", http.StatusUnauthorized)
 			return
 		}
 
-		role := claims["role"].(string)
-		if strings.ToUpper(role) != "ADMIN" {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+		// check users' role
+		role, ok := claims["role"].(string)
+		if !ok || role != "ADMIN" {
+			http.Error(w, "Forbidden: Insufficient permissions", http.StatusForbidden)
 			return
 		}
 
-		query := `SELECT u.id, u.password_hash, r.name AS role_name FROM users u JOIN roles r ON u.role_id = r.id`
+		// fetch users, along with their roles from the database
+		query := `
+			SELECT
+				u.id,
+				u.name,
+				u.surname,
+				u.username,
+				u.email,
+				u.last_login,
+				u.created_at,
+				r.name AS role_name
+			FROM users u
+			JOIN roles r ON u.role_id = r.id
+			ORDER BY u.id ASC`
 
 		rows, err := pool.Query(r.Context(), query)
 		if err != nil {
@@ -62,25 +93,34 @@ func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		var users []map[string]interface{}
+		// parse the rows into JSON response
+		users := []map[string]interface{}{}
 		for rows.Next() {
-			var user struct {
-				ID       int    `json:"id"`
-				Username string `json:"username"`
-				Role     string `json:"role"`
-			}
-			if err := rows.Scan(&user.ID, &user.Username, &user.Role); err != nil {
+			var id int
+			var name, surname, username, roleName, email string
+			var lastLogin, createdAt time.Time
+
+			if err := rows.Scan(&id, &name, &surname, &username, &email, &lastLogin, &createdAt, &roleName); err != nil {
 				http.Error(w, "Failed to parse user data", http.StatusInternalServerError)
 				return
 			}
+
 			users = append(users, map[string]interface{}{
-				"id":       user.ID,
-				"username": user.Username,
-				"role":     user.Role,
+				"id":          id,
+				"name":        name,
+				"surnamename": surname,
+				"username":    username,
+				"email":       email,
+				"last_login":  lastLogin,
+				"created_at":  createdAt,
+				"role_name":   roleName,
 			})
 		}
 
+		// set the headers and encode the reponse
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(users)
+		if err := json.NewEncoder(w).Encode(users); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 	}
 }
