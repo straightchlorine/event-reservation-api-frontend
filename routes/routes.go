@@ -11,12 +11,13 @@ import (
 func SetupRoutes(pool *pgxpool.Pool, jwtSecret string) *mux.Router {
 	r := mux.NewRouter()
 
-	authMiddleware := middlewares.RequireAuth(jwtSecret)
-
 	// Public routes (no auth required)
 	r.HandleFunc("/login", handlers.LoginHandler(pool, jwtSecret)).Methods("POST")
 
 	userRouter := r.PathPrefix("/api/users").Subrouter()
+
+	// Authentication required for user routes
+	authMiddleware := middlewares.RequireAuth(jwtSecret)
 	userRouter.Use(authMiddleware)
 	userRouter.HandleFunc("/", handlers.GetUserHandler(pool)).Methods("GET")
 
