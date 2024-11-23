@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"net/http"
+
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -12,14 +14,15 @@ func SetupRoutes(pool *pgxpool.Pool, jwtSecret string) *mux.Router {
 	r := mux.NewRouter()
 
 	// Public routes (no auth required)
-	r.HandleFunc("/login", handlers.LoginHandler(pool, jwtSecret)).Methods("POST")
+	r.HandleFunc("/login", handlers.LoginHandler(pool, jwtSecret)).Methods(http.MethodPost)
 
 	userRouter := r.PathPrefix("/api/users").Subrouter()
 
 	// Authentication required for user routes
 	authMiddleware := middlewares.RequireAuth(jwtSecret)
 	userRouter.Use(authMiddleware)
-	userRouter.HandleFunc("/", handlers.GetUserHandler(pool)).Methods("GET")
+	userRouter.HandleFunc("", handlers.GetUserHandler(pool)).Methods(http.MethodGet)
+	userRouter.HandleFunc("/{id}", handlers.GetUserByIDHandler(pool)).Methods(http.MethodGet)
 
 	return r
 }

@@ -7,12 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/mux"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"event-reservation-api/middlewares"
+	"event-reservation-api/models"
 )
-
-// FetchRole fetches the role name associated with a given role ID.
 
 /*
 Fetch the role name associated with a given role ID.
@@ -39,8 +40,6 @@ func FetchRole(ctx context.Context, pool *pgxpool.Pool, roleID int) (string, err
 
 	return strings.ToUpper(roleName), nil
 }
-
-// GetUserHandler retrieves all users. Only accessible to users with the ADMIN role.
 
 /*
 Retrieve all users.
@@ -72,8 +71,7 @@ func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		// fetch users, along with their roles from the database
-		query := `
-			SELECT
+		query := `SELECT
 				u.id,
 				u.name,
 				u.surname,
@@ -122,5 +120,89 @@ func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		if err := json.NewEncoder(w).Encode(users); err != nil {
 			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		}
+	}
+}
+
+/*
+Retrieve a user by ID.
+
+Available only for admin users.
+
+Arguments:
+
+	pool: A connection pool to the database.
+
+Returns:
+
+	http.HandlerFunc: A function handler for fetching a user by ID.
+*/
+func GetUserByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// get the user id from the query parameter
+		vars := mux.Vars(r)
+		userId, ok := vars["id"]
+
+		if !ok {
+			http.Error(w, "User ID not provided", http.StatusBadRequest)
+			return
+		}
+
+		// query to get all the information about the user
+		query := `SELECT
+				u.id,
+				u.name,
+				u.surname,
+				u.username,
+				u.email,
+				u.last_login,
+				u.created_at,
+				u.is_active,
+				r.name AS role_name
+			FROM users u
+			JOIN roles r ON u.role_id = r.id
+			WHERE u.id = $1`
+
+		var roleName string
+		user := models.User{}
+
+		// query the database and return any errors during the Scan
+		row := pool.QueryRow(r.Context(), query, userId)
+		err := row.Scan(
+			&user.ID,
+			&user.Name,
+			&user.Surname,
+			&user.Username,
+			&user.Email,
+			&user.LastLogin,
+			&user.CreatedAt,
+			&user.IsActive,
+			&roleName,
+		)
+
+		if err == pgx.ErrNoRows {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(w, "Failed to parse user data", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// parsed response
+		userResponse := map[string]interface{}{
+			"id":         user.ID,
+			"name":       user.Name,
+			"surname":    user.Surname,
+			"username":   user.Username,
+			"email":      user.Email,
+			"last_login": user.LastLogin,
+			"created_at": user.CreatedAt,
+			"is_active":  user.IsActive,
+			"role_name":  roleName,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(userResponse)
 	}
 }
