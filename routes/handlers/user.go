@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -18,123 +17,9 @@ import (
 )
 
 /*
-Fetch the role name associated with a given role ID.
-
-Arguments:
-
-	ctx: The request context.
-	pool: A connection pool to the database.
-	roleID: The ID of the role to fetch.
-
-Returns:
-
-	roleName and error (nil if successful).
-*/
-func FetchRole(ctx context.Context, pool *pgxpool.Pool, roleID int) (string, error) {
-	var roleName string
-
-	// fetch the role name by ID
-	query := "SELECT name FROM roles WHERE id = $1"
-	err := pool.QueryRow(ctx, query, roleID).Scan(&roleName)
-	if err != nil {
-		return "", err // if the query fails, return error
-	}
-
-	return strings.ToUpper(roleName), nil
-}
-
-/*
-Fetch the role id associated with a given role name.
-
-Arguments:
-
-	ctx: The request context.
-	pool: A connection pool to the database.
-	roleName: The name of the role to fetch.
-
-Returns:
-
-	roleId and error (nil if successful).
-*/
-func FetchRoleId(ctx context.Context, pool *pgxpool.Pool, roleName string) (int, error) {
-	var roleId int
-
-	// ensure case insensitivity
-	roleName = strings.ToUpper(roleName)
-
-	// fetch the role name by ID
-	query := "SELECT id FROM roles WHERE name = $1"
-	err := pool.QueryRow(ctx, query, roleName).Scan(&roleId)
-	if err != nil {
-		return -1, err // if the query fails, return error
-	}
-
-	return roleId, nil
-}
-
-/*
-Check if a user with the same username already exists.
-
-Arguments:
-
-	ctx: The request context.
-	pool: A connection pool to the database.
-	username: The username to check for duplicates.
-	exludeID: Address of the ID to exclude from the check, if nil every record
-		will be checked.
-*/
-func checkDuplicateUsername(
-	ctx context.Context,
-	pool *pgxpool.Pool,
-	username string,
-	excludeID *string,
-) error {
-	var existingID string
-	var err error
-
-	if excludeID == nil {
-		query := `
-					SELECT id
-					FROM users
-					WHERE username = $1
-					LIMIT 1
-		`
-		err = pool.QueryRow(ctx, query, username).Scan(&existingID)
-
-	} else {
-		query := `
-					SELECT id
-					FROM users
-					WHERE username = $1 AND id != $2
-					LIMIT 1
-		`
-		err = pool.QueryRow(ctx, query, username, *excludeID).Scan(&existingID)
-	}
-
-	// if record is found, it means that entry already exists
-	if err == nil {
-		return fmt.Errorf("Username '%s' is already taken", username)
-	}
-	if err == pgx.ErrNoRows {
-		return nil
-	}
-
-	// in case of an unexpected error
-	return fmt.Errorf("Error checking for duplicate username: %w", err)
-}
-
-/*
 Retrieve all users.
 
 Available only for admin users.
-
-Arguments:
-
-	pool: A connection pool to the database.
-
-Returns:
-
-	http.HandlerFunc: A function handler for fetching users.
 */
 func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -209,14 +94,6 @@ func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 Retrieve a user by ID.
 
 Available only for admin users.
-
-Arguments:
-
-	pool: A connection pool to the database.
-
-Returns:
-
-	http.HandlerFunc: A function handler for fetching a user by ID.
 */
 func GetUserByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -297,17 +174,15 @@ func GetUserByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 Create a new user.
 
 Available only for admin users.
-
-Arguments:
-
-	pool: A connection pool to the database.A
-
-Returns:
-
-	http.HandlerFunc: A function handler for creating a new user.
 */
 func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// check if the user is an admin
+		if !isAdmin(r) {
+			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
+			return
+		}
+
 		var user struct {
 			Name     string `json:"name"`
 			Surname  string `json:"surname"`
@@ -320,15 +195,19 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		// parse the json request
 		if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-			http.Error(w, "Invalid request payload", http.StatusBadRequest)
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			handleError(w, http.StatusBadRequest, "Invalid JSON input", err)
+			return
+		}
+
+		// validate input fields
+		if user.Username == "" || user.Password == "" || user.RoleName == "" {
+			handleError(w, http.StatusBadRequest, "Missing required fields", nil)
 			return
 		}
 
 		// in case user already exists
-		err := checkDuplicateUsername(r.Context(), pool, user.Username, nil)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusConflict) // 409 Conflict
+		if err := checkDuplicateUsername(r.Context(), pool, user.Username, nil); err != nil {
+			handleError(w, http.StatusConflict, "Username already exists", err)
 			return
 		}
 
@@ -338,7 +217,7 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			bcrypt.DefaultCost,
 		)
 		if err != nil {
-			http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+			handleError(w, http.StatusInternalServerError, "Failed to hash password", err)
 			return
 		}
 
@@ -351,7 +230,7 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		// fetch the role ID associated with the role name
 		roleId, err := FetchRoleId(r.Context(), pool, user.RoleName)
 		if err != nil {
-			http.Error(w, "Failed to fetch user roles", http.StatusInternalServerError)
+			handleError(w, http.StatusInternalServerError, "Failed to fetch user roles", err)
 			return
 		}
 
@@ -359,52 +238,44 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		_, err = pool.Exec(
 			r.Context(),
 			query,
-			// user table fields
 			user.Name,
 			user.Surname,
 			user.Username,
 			user.Email,
-			// last_login
-			// created_at
 			passwordHash,
 			roleId,
 			user.IsActive,
 		)
 		if err != nil {
-			http.Error(w, "Failed to create user", http.StatusInternalServerError)
+			handleError(w, http.StatusInternalServerError, "Failed to create user", err)
 			return
 		}
 
-		// write response
-		w.WriteHeader(http.StatusCreated)
-		_, err = w.Write([]byte(`{"message": "User created successfully"}`))
-		if err != nil {
-			http.Error(w, "Failed to write response", http.StatusInternalServerError)
-		}
+		writeJSONResponse(
+			w,
+			http.StatusCreated,
+			map[string]string{"message": "User created successfully"},
+		)
 	}
 }
 
 /*
-Update existing
+Update existing user.
 
 Available only for admin users.
-
-Arguments:
-
-	pool: A connection pool to the database.A
-
-Returns:
-
-	http.HandlerFunc: A function handler for updating a new user.
 */
 func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !isAdmin(r) {
+			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
+			return
+		}
+
 		// parse the user id from the url
 		vars := mux.Vars(r)
 		userId, ok := vars["id"]
-
 		if !ok {
-			http.Error(w, "User ID not provided", http.StatusBadRequest)
+			handleError(w, http.StatusBadRequest, "User ID not provided in the query", nil)
 			return
 		}
 
@@ -413,6 +284,7 @@ func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			Name     *string `json:"name"`
 			Surname  *string `json:"surname"`
 			Username *string `json:"username"`
+			Password *string `json:"password"`
 			Email    *string `json:"email"`
 			RoleName *string `json:"role_name"`
 			IsActive *bool   `json:"is_active"`
@@ -424,12 +296,21 @@ func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// check if the user exists
+		if user_request.Username != nil {
+			if err := checkDuplicateUsername(r.Context(), pool, *user_request.Username, &userId); err != nil {
+				handleError(w, http.StatusConflict, "Username already exists", err)
+				return
+			}
+		}
+
 		// building the update query
 		query := `UPDATE users SET `
 		args := []interface{}{}
 		idx := 1
 
-		// go over each field and build the query accordingly
+		var hashedPassword *string
+
 		if user_request.Name != nil {
 			query += fmt.Sprintf("name = $%d, ", idx)
 			args = append(args, *user_request.Name)
@@ -441,16 +322,24 @@ func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			idx++
 		}
 		if user_request.Username != nil {
-
-			// check for duplicate username
-			err := checkDuplicateUsername(r.Context(), pool, *user_request.Username, &userId)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusConflict) // 409 Conflict
-				return
-			}
-
 			query += fmt.Sprintf("username = $%d, ", idx)
 			args = append(args, *user_request.Surname)
+			idx++
+		}
+		if user_request.Password != nil {
+			hashed, err := bcrypt.GenerateFromPassword(
+				[]byte(*user_request.Password),
+				bcrypt.DefaultCost,
+			)
+			if err != nil {
+				handleError(w, http.StatusInternalServerError, "Failed to hash password", err)
+				return
+			}
+			hashedStr := string(hashed)
+			hashedPassword = &hashedStr
+
+			query += fmt.Sprintf("password_hash = $%d, ", idx)
+			args = append(args, *hashedPassword)
 			idx++
 		}
 		if user_request.Email != nil {
@@ -484,16 +373,16 @@ func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		// execute the query
 		_, err := pool.Exec(r.Context(), query, args...)
 		if err != nil {
-			http.Error(w, "Failed to update user", http.StatusInternalServerError)
+			handleError(w, http.StatusInternalServerError, "Failed to update user", err)
 			return
 		}
 
 		// write response
-		w.WriteHeader(http.StatusOK)
-		_, err = w.Write([]byte(`{"message": "User updated successfully"}`))
-		if err != nil {
-			http.Error(w, "Failed to write response", http.StatusInternalServerError)
-		}
+		writeJSONResponse(
+			w,
+			http.StatusOK,
+			map[string]string{"message": "User updated successfully"},
+		)
 	}
 }
 
@@ -501,23 +390,19 @@ func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 Delete user by ID.
 
 Available only for admin users.
-
-Arguments:
-
-	pool: A connection pool to the database.A
-
-Returns:
-
-	http.HandlerFunc: A function handler for deleting a user.
 */
 func DeleteUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !isAdmin(r) {
+			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
+			return
+		}
+
 		// parse the user id from the url
 		vars := mux.Vars(r)
 		userId, ok := vars["id"]
-
 		if !ok {
-			http.Error(w, "User ID not provided", http.StatusBadRequest)
+			handleError(w, http.StatusBadRequest, "User ID not provided in the url", nil)
 			return
 		}
 
@@ -525,15 +410,15 @@ func DeleteUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		query := `DELETE FROM users WHERE id = $1`
 		_, err := pool.Exec(r.Context(), query, userId)
 		if err != nil {
-			http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+			handleError(w, http.StatusInternalServerError, "Failed to delete user", err)
 			return
 		}
 
 		// write response
-		w.WriteHeader(http.StatusOK)
-		_, err = w.Write([]byte(`{"message": "User deleted successfully"}`))
-		if err != nil {
-			http.Error(w, "Failed to write response", http.StatusInternalServerError)
-		}
+		writeJSONResponse(
+			w,
+			http.StatusNoContent,
+			map[string]string{"message": "User deleted successfully"},
+		)
 	}
 }
