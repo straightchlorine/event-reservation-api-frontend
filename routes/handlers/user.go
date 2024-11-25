@@ -68,13 +68,13 @@ func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			users = append(users, map[string]interface{}{
-				"id":         id,
-				"name":       name,
-				"surname":    surname,
-				"username":   username,
-				"email":      email,
-				"last_login": lastLogin,
-				"created_at": createdAt,
+				"id":         user.ID,
+				"name":       user.Name,
+				"surname":    user.Surname,
+				"username":   user.Username,
+				"email":      user.Email,
+				"last_login": user.LastLogin,
+				"created_at": user.CreatedAt,
 				"role_name":  roleName,
 			})
 		}
@@ -406,7 +406,7 @@ func DeleteUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		// write response
 		writeJSONResponse(
 			w,
-			http.StatusNoContent,
+			http.StatusOK,
 			map[string]string{"message": "User deleted successfully"},
 		)
 	}
