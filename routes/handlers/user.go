@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
-	"event-reservation-api/middlewares"
 	"event-reservation-api/models"
 )
 
@@ -24,16 +22,8 @@ Available only for admin users.
 func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// get the claims from the context
-		claims, err := middlewares.GetClaimsFromContext(r.Context())
-		if err != nil {
-			http.Error(w, "Unauthorized: Missing or invalid token", http.StatusUnauthorized)
-			return
-		}
-
-		// check users' role
-		role, ok := claims["role"].(string)
-		if !ok || role != "ADMIN" {
-			http.Error(w, "Forbidden: Insufficient permissions", http.StatusForbidden)
+		if !isAdmin(r) {
+			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
 			return
 		}
 
@@ -53,7 +43,7 @@ func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		rows, err := pool.Query(r.Context(), query)
 		if err != nil {
-			http.Error(w, "Failed to fetch users", http.StatusInternalServerError)
+			handleError(w, http.StatusInternalServerError, "Failed to fetch users", err)
 			return
 		}
 		defer rows.Close()
@@ -61,32 +51,36 @@ func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		// parse the rows into JSON response
 		users := []map[string]interface{}{}
 		for rows.Next() {
-			var id int
-			var name, surname, username, roleName, email string
-			var lastLogin, createdAt time.Time
-
-			if err := rows.Scan(&id, &name, &surname, &username, &email, &lastLogin, &createdAt, &roleName); err != nil {
-				http.Error(w, "Failed to parse user data", http.StatusInternalServerError)
+			var user models.User
+			var roleName string
+			err := rows.Scan(
+				&user.ID,
+				&user.Name,
+				&user.Surname,
+				&user.Username,
+				&user.Email,
+				&user.LastLogin,
+				&user.CreatedAt,
+				&roleName,
+			)
+			if err != nil {
+				handleError(w, http.StatusInternalServerError, "Failed to parse user data", err)
 				return
 			}
-
 			users = append(users, map[string]interface{}{
-				"id":          id,
-				"name":        name,
-				"surnamename": surname,
-				"username":    username,
-				"email":       email,
-				"last_login":  lastLogin,
-				"created_at":  createdAt,
-				"role_name":   roleName,
+				"id":         id,
+				"name":       name,
+				"surname":    surname,
+				"username":   username,
+				"email":      email,
+				"last_login": lastLogin,
+				"created_at": createdAt,
+				"role_name":  roleName,
 			})
 		}
 
 		// set the headers and encode the reponse
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(users); err != nil {
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		}
+		writeJSONResponse(w, http.StatusOK, users)
 	}
 }
 
@@ -97,12 +91,16 @@ Available only for admin users.
 */
 func GetUserByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// get the user id from the query parameter
+		if !isAdmin(r) {
+			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
+			return
+		}
+
+		// parse the user id from the url
 		vars := mux.Vars(r)
 		userId, ok := vars["id"]
-
 		if !ok {
-			http.Error(w, "User ID not provided", http.StatusBadRequest)
+			handleError(w, http.StatusBadRequest, "User ID not provided in the url", nil)
 			return
 		}
 
@@ -139,17 +137,15 @@ func GetUserByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		)
 
 		if err == pgx.ErrNoRows {
-			http.Error(w, "User not found", http.StatusNotFound)
+			handleError(w, http.StatusNotFound, "User not found", nil)
 			return
 		}
 		if err != nil {
-			http.Error(w, "Failed to parse user data", http.StatusInternalServerError)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			handleError(w, http.StatusInternalServerError, "Failed to fetch user", err)
 			return
 		}
 
-		// parsed response
-		userResponse := map[string]interface{}{
+		writeJSONResponse(w, http.StatusOK, map[string]interface{}{
 			"id":         user.ID,
 			"name":       user.Name,
 			"surname":    user.Surname,
@@ -159,14 +155,7 @@ func GetUserByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			"created_at": user.CreatedAt,
 			"is_active":  user.IsActive,
 			"role_name":  roleName,
-		}
-
-		// encode response
-		w.Header().Set("Content-Type", "application/json")
-		err = json.NewEncoder(w).Encode(userResponse)
-		if err != nil {
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		}
+		})
 	}
 }
 
