@@ -22,16 +22,20 @@ func SetupRoutes(pool *pgxpool.Pool, jwtSecret string) *mux.Router {
 	r.HandleFunc("/api/events", handlers.GetEventsHandler(pool)).Methods(http.MethodGet)
 	r.HandleFunc("/api/events/{id}", handlers.GetEventByIDHandler(pool)).Methods(http.MethodGet)
 
-	reservationRouter := r.PathPrefix("/api/reservations").Subrouter()
-	reservationRouter.Use(authMiddleware)
-	reservationRouter.HandleFunc("", handlers.CreateReservationHandler(pool)).
-		Methods(http.MethodPut)
-	reservationRouter.HandleFunc("", handlers.GetReservationHandler(pool)).Methods(http.MethodGet)
-	reservationRouter.HandleFunc("/{id}", handlers.GetReservationByIDHandler(pool)).
-		Methods(http.MethodGet)
-	reservationRouter.HandleFunc("/{id}", handlers.UpdateReservationHandler(pool)).
-		Methods(http.MethodPut)
-	reservationRouter.HandleFunc("/{id}", handlers.DeleteReservationHandler(pool)).
+	locRouter := r.PathPrefix("/api/locations").Subrouter()
+	locRouter.HandleFunc("", handlers.CreateLocationHandler(pool)).Methods(http.MethodPut)
+	locRouter.HandleFunc("", handlers.GetLocationsHandler(pool)).Methods(http.MethodGet)
+	locRouter.HandleFunc("/{id}", handlers.GetLocationByIDHandler(pool)).Methods(http.MethodGet)
+	locRouter.HandleFunc("/{id}", handlers.UpdateLocationHandler(pool)).Methods(http.MethodPut)
+	locRouter.HandleFunc("/{id}", handlers.DeleteLocationHandler(pool)).Methods(http.MethodDelete)
+
+	resRouter := r.PathPrefix("/api/reservations").Subrouter()
+	resRouter.Use(authMiddleware)
+	resRouter.HandleFunc("", handlers.CreateReservationHandler(pool)).Methods(http.MethodPut)
+	resRouter.HandleFunc("", handlers.GetReservationHandler(pool)).Methods(http.MethodGet)
+	resRouter.HandleFunc("/{id}", handlers.GetReservationByIDHandler(pool)).Methods(http.MethodGet)
+	resRouter.HandleFunc("/{id}", handlers.UpdateReservationHandler(pool)).Methods(http.MethodPut)
+	resRouter.HandleFunc("/{id}", handlers.DeleteReservationHandler(pool)).
 		Methods(http.MethodDelete)
 
 	eventRouter := r.PathPrefix("/api/events").Subrouter()
