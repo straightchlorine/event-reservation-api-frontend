@@ -13,13 +13,23 @@ import (
 func SetupRoutes(pool *pgxpool.Pool, jwtSecret string) *mux.Router {
 	r := mux.NewRouter()
 
+	// Authentication middleware
+	authMiddleware := middlewares.RequireAuth(jwtSecret)
+
 	// Public routes (no auth required)
 	r.HandleFunc("/login", handlers.LoginHandler(pool, jwtSecret)).Methods(http.MethodPost)
 
+	r.HandleFunc("/api/events", handlers.GetEventsHandler(pool)).Methods(http.MethodGet)
+	r.HandleFunc("/api/events/{id}", handlers.GetEventByIDHandler(pool)).Methods(http.MethodGet)
+
+	eventRouter := r.PathPrefix("/api/events").Subrouter()
+	eventRouter.Use(authMiddleware)
+	eventRouter.HandleFunc("", handlers.CreateEventHandler(pool)).Methods(http.MethodPut)
+	eventRouter.HandleFunc("/{id}", handlers.UpdateEventHandler(pool)).Methods(http.MethodPut)
+	eventRouter.HandleFunc("/{id}", handlers.DeleteEventHandler(pool)).Methods(http.MethodDelete)
+
 	userRouter := r.PathPrefix("/api/users").Subrouter()
 
-	// Authentication required for user routes
-	authMiddleware := middlewares.RequireAuth(jwtSecret)
 	userRouter.Use(authMiddleware)
 	userRouter.HandleFunc("", handlers.GetUserHandler(pool)).Methods(http.MethodGet)
 	userRouter.HandleFunc("/{id}", handlers.GetUserByIDHandler(pool)).Methods(http.MethodGet)

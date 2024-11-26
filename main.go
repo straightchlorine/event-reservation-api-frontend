@@ -68,7 +68,7 @@ func main() {
 	r := routes.SetupRoutes(pool, jwtSecret)
 
 	// Start the server (defaults to port 8080).
-	port := os.Getenv("PORT")
+	port := os.Getenv("API_PORT")
 	if port == "" {
 		port = "8080"
 	}
