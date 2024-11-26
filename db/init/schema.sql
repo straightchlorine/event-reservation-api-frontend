@@ -114,9 +114,9 @@ CREATE TABLE Reservations (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   total_tickets INT NOT NULL CHECK (total_tickets > 0),
   status_id INT NOT NULL,
-  CONSTRAINT fk_group_order_user FOREIGN KEY (primary_user_id) REFERENCES Users (id) ON DELETE CASCADE,
-  CONSTRAINT fk_group_order_event FOREIGN KEY (event_id) REFERENCES Events (id) ON DELETE CASCADE,
-  CONSTRAINT fk_group_order_status FOREIGN KEY (status_id) REFERENCES ReservationStatuses (id) ON DELETE CASCADE
+  CONSTRAINT fk_reservation_user FOREIGN KEY (primary_user_id) REFERENCES Users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_reservation_event FOREIGN KEY (event_id) REFERENCES Events (id) ON DELETE CASCADE,
+  CONSTRAINT fk_reservation_status FOREIGN KEY (status_id) REFERENCES ReservationStatuses (id) ON DELETE CASCADE
 );
 
 -- Ticket Types
@@ -135,15 +135,14 @@ CREATE TABLE TicketStatuses (
 
 -- Tickets Table
 CREATE TABLE Tickets (
-  id SERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
   event_id INT NOT NULL,
   reservation_id UUID,
   price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
   type_id INT NOT NULL,
   status_id INT NOT NULL,
-  seat_number VARCHAR(20),
   CONSTRAINT fk_ticket_event FOREIGN KEY (event_id) REFERENCES Events (id) ON DELETE CASCADE,
-  CONSTRAINT fk_ticket_group_order FOREIGN KEY (reservation_id) REFERENCES Reservations (id) ON DELETE CASCADE,
+  CONSTRAINT fk_ticket_reservation_id FOREIGN KEY (reservation_id) REFERENCES Reservations (id) ON DELETE CASCADE,
   CONSTRAINT fk_ticket_type FOREIGN KEY (type_id) REFERENCES TicketTypes (id) ON DELETE CASCADE,
   CONSTRAINT fk_ticket_status FOREIGN KEY (status_id) REFERENCES TicketStatuses (id) ON DELETE CASCADE
 );
@@ -161,7 +160,7 @@ CREATE TABLE Payment (
   status_id INT NOT NULL,
   total_amount DECIMAL(10, 2) NOT NULL,
   payment_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_payment_group_order FOREIGN KEY (order_id) REFERENCES Reservations (id) ON DELETE CASCADE,
+  CONSTRAINT fk_payment_reservation FOREIGN KEY (order_id) REFERENCES Reservations (id) ON DELETE CASCADE,
   CONSTRAINT fk_payment_status FOREIGN KEY (status_id) REFERENCES PaymentStatuses (id) ON DELETE CASCADE
 );
 
@@ -273,6 +272,6 @@ VALUES
 INSERT INTO
   TicketTypes (name, discount, description)
 VALUES
-  ('Standard', 0.00, 'Regular price ticket'),
-  ('Student', 0.20, '20% discount for students'),
-  ('Senior', 0.15, '15% discount for seniors');
+  ('STANDARD', 0.00, 'Regular price ticket'),
+  ('STUDENT', 0.20, '20% discount for students'),
+  ('SENIOR', 0.15, '15% discount for seniors');

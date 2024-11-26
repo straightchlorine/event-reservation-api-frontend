@@ -94,7 +94,6 @@ type Ticket struct {
 	Price         float64   `json:"price"`
 	TypeID        int       `json:"type_id"`
 	StatusID      int       `json:"status_id"`
-	SeatNumber    string    `json:"seat_number,omitempty"`
 }
 
 // PaymentStatus table record

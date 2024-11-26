@@ -420,19 +420,17 @@ func populateTickets(ctx context.Context, pool *pgxpool.Pool) error {
 			Price:         fake.Price(10, 1000),
 			TypeID:        ticketTypeIDs[i%len(ticketTypeIDs)],
 			StatusID:      ticketStatusIDs[i%len(ticketStatusIDs)],
-			SeatNumber:    fake.Word(),
 		}
 
 		// fill the batch with requests
 		batch.Queue(
-			`INSERT INTO Tickets (event_id, reservation_id, price, type_id, status_id, seat_number)
-        VALUES ($1, $2, $3, $4, $5, $6)`,
+			`INSERT INTO Tickets (event_id, reservation_id, price, type_id, status_id)
+        VALUES ($1, $2, $3, $4, $5)`,
 			tickets[i].EventID,
 			tickets[i].ReservationID,
 			tickets[i].Price,
 			tickets[i].TypeID,
 			tickets[i].StatusID,
-			tickets[i].SeatNumber,
 		)
 	}
 
