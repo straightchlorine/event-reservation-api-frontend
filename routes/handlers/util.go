@@ -14,6 +14,97 @@ import (
 	"event-reservation-api/middlewares"
 )
 
+func fetchTicketStatus(
+	r *http.Request,
+	tx pgx.Tx,
+	statusName string) (int, error) {
+	var statusID int
+	query := "SELECT id FROM ticketstatuses WHERE name = $1"
+	err := tx.QueryRow(r.Context(), query, statusName).Scan(&statusID)
+	if err != nil {
+		return -1, fmt.Errorf("Unable to fetch ticket status: %w", err)
+	}
+	return statusID, nil
+}
+
+func fetchTicketDiscount(
+	r *http.Request,
+	tx pgx.Tx,
+	ticketType string) (float64, error) {
+	var discount float64
+	query := "SELECT discount FROM tickettypes WHERE name = $1"
+	err := tx.QueryRow(r.Context(), query, ticketType).Scan(&discount)
+	if err != nil {
+		return -1, fmt.Errorf("Unable to fetch discount: %w", err)
+	}
+	return discount, nil
+}
+
+func fetchTicketType(
+	r *http.Request,
+	tx pgx.Tx,
+	statusName string) (int, error) {
+	var statusID int
+	query := "SELECT id FROM tickettypes WHERE name = $1"
+	err := tx.QueryRow(r.Context(), query, statusName).Scan(&statusID)
+	if err != nil {
+		return -1, fmt.Errorf("Unable to fetch ticket type: %w", err)
+	}
+	return statusID, nil
+}
+
+func fetchReservationStatusPool(
+	r *http.Request,
+	pool *pgxpool.Pool,
+	statusName string) (int, error) {
+	var statusID int
+	query := "SELECT id FROM reservationstatuses WHERE name = $1"
+	err := pool.QueryRow(r.Context(), query, statusName).Scan(&statusID)
+	if err != nil {
+		return -1, fmt.Errorf("Unable to fetch status id: %w", err)
+	}
+	return statusID, nil
+}
+
+func fetchReservationStatus(
+	r *http.Request,
+	tx pgx.Tx,
+	statusName string) (int, error) {
+	var statusID int
+	query := "SELECT id FROM reservationstatuses WHERE name = $1"
+	err := tx.QueryRow(r.Context(), query, statusName).Scan(&statusID)
+	if err != nil {
+		return -1, fmt.Errorf("Unable to fetch status id: %w", err)
+	}
+	return statusID, nil
+}
+
+func getEventAvailableTickets(
+	r *http.Request,
+	tx pgx.Tx,
+	eventID int) (int, error) {
+	var availableTickets int
+	query := "SELECT available_tickets FROM events WHERE id = $1"
+	err := tx.QueryRow(r.Context(), query, eventID).Scan(&availableTickets)
+	if err != nil {
+		return 0.0, fmt.Errorf("Unable to fetch available tickets: %w", err)
+	}
+	return availableTickets, nil
+}
+
+func getEventBasePrice(
+	r *http.Request,
+	tx pgx.Tx,
+	eventID int) (float64, error) {
+	var eventBasePrice float64
+	query := "SELECT price FROM events WHERE id = $1"
+	err := tx.QueryRow(r.Context(), query, eventID).Scan(&eventBasePrice)
+	if err != nil {
+		return 0.0, fmt.Errorf("Unable to fetch event base price: %w", err)
+	}
+	return eventBasePrice, nil
+}
+
 // Utility to check if a location exists within the database.
 func getLocationID(
 	r *http.Request,
@@ -151,7 +242,7 @@ func isRegistered(r *http.Request) bool {
 		return false
 	}
 	role, ok := claims["role"].(string)
-	return ok && role == "REGISTERED"
+	return ok && (role == "REGISTERED" || role == "ADMIN")
 }
 
 // Fetch the role name associated with a given role ID.
