@@ -210,12 +210,6 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// query template for inserting a user
-		query := `INSERT INTO Users (name, surname, username,
-                          email, last_login, created_at,
-                          password_hash, role_id, is_active)
-					VALUES ($1, $2, $3, $4, NOW(), NOW(), $5, $6, $7)`
-
 		// fetch the role ID associated with the role name
 		roleId, err := FetchRoleId(r.Context(), pool, user.RoleName)
 		if err != nil {
@@ -223,8 +217,18 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// query template for inserting a user
+		var userId int
+		query := `
+			INSERT INTO Users (name, surname, username,
+													email, last_login, created_at,
+                          password_hash, role_id, is_active)
+			VALUES ($1, $2, $3, $4, NOW(), NOW(), $5, $6, $7)
+			RETURNING id
+		`
+
 		// execute the query
-		_, err = pool.Exec(
+		err = pool.QueryRow(
 			r.Context(),
 			query,
 			user.Name,
@@ -234,7 +238,7 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			passwordHash,
 			roleId,
 			user.IsActive,
-		)
+		).Scan(&userId)
 		if err != nil {
 			handleError(w, http.StatusInternalServerError, "Failed to create user", err)
 			return
@@ -243,7 +247,10 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		writeJSONResponse(
 			w,
 			http.StatusCreated,
-			map[string]string{"message": "User created successfully"},
+			map[string]interface{}{
+				"message": "User created successfully",
+				"userId":  userId,
+			},
 		)
 	}
 }
