@@ -51,6 +51,7 @@ type Event struct {
 	ID               int       `json:"id"`
 	Name             string    `json:"name"`
 	Date             time.Time `json:"date"`
+	Price            float64   `json:"price"`
 	LocationID       int       `json:"location_id"`
 	AvailableTickets int       `json:"available_tickets"`
 }

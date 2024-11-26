@@ -220,9 +220,10 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		// query template for inserting a user
 		var userId int
 		query := `
-			INSERT INTO Users (name, surname, username,
-													email, last_login, created_at,
-                          password_hash, role_id, is_active)
+			INSERT INTO Users
+				(name, surname, username,
+				email, last_login, created_at,
+				password_hash, role_id, is_active)
 			VALUES ($1, $2, $3, $4, NOW(), NOW(), $5, $6, $7)
 			RETURNING id
 		`

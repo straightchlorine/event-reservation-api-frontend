@@ -308,16 +308,18 @@ func populateEvents(ctx context.Context, pool *pgxpool.Pool) error {
 		events[i] = models.Event{
 			Name:             fake.Country() + "-" + fake.Country(),
 			Date:             fake.FutureDate(),
+			Price:            fake.Price(10, 1000),
 			LocationID:       locationIDs[i%len(locationIDs)],
 			AvailableTickets: fake.Number(1000, 50000),
 		}
 
 		// fill the batch with requests
 		batch.Queue(
-			`INSERT INTO Events (name, date, location_id, available_tickets)
-        VALUES ($1, $2, $3, $4)`,
+			`INSERT INTO Events (name, date, price, location_id, available_tickets)
+        VALUES ($1, $2, $3, $4, $5)`,
 			events[i].Name,
 			events[i].Date,
+			events[i].Price,
 			events[i].LocationID,
 			events[i].AvailableTickets,
 		)

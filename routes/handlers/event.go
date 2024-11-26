@@ -19,6 +19,7 @@ func GetEventsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				e.id,
 				e.name,
 				e.date,
+				e.price,
 				e.available_tickets,
 				l.stadium,
 				l.address,
@@ -44,6 +45,7 @@ func GetEventsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				&event.ID,
 				&event.Name,
 				&event.Date,
+				&event.Price,
 				&event.AvailableTickets,
 				&location.Stadium,
 				&location.Address,
@@ -65,6 +67,7 @@ func GetEventsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			events = append(events, map[string]interface{}{
 				"id":                event.ID,
 				"name":              event.Name,
+				"price":             event.Price,
 				"date":              event.Date,
 				"available_tickets": event.AvailableTickets,
 				"location":          location_json,
@@ -89,6 +92,7 @@ func GetEventByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				e.id,
 				e.name,
 				e.date,
+				e.price,
 				e.available_tickets,
 				l.stadium,
 				l.address,
@@ -107,6 +111,7 @@ func GetEventByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			&event.ID,
 			&event.Name,
 			&event.Date,
+			&event.Price,
 			&event.AvailableTickets,
 			&location.Stadium,
 			&location.Address,
@@ -129,6 +134,7 @@ func GetEventByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			"id":                event.ID,
 			"name":              event.Name,
 			"date":              event.Date,
+			"price":             event.Price,
 			"available_tickets": event.AvailableTickets,
 			"location":          location_json,
 		})
@@ -145,9 +151,10 @@ func CreateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		// input structure in order to create an event
 		var input struct {
-			Name             string `json:"name"`
-			Date             string `json:"date"`
-			AvailableTickets int    `json:"available_tickets"`
+			Name             string  `json:"name"`
+			Date             string  `json:"date"`
+			AvailableTickets int     `json:"available_tickets"`
+			Price            float64 `json:"price"`
 			Location         struct {
 				Address  string `json:"address"`
 				Capacity int    `json:"capacity,omitempty"`
@@ -199,8 +206,8 @@ func CreateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		// insert new event
 		var eventID int
 		eventQuery := `
-				INSERT INTO Events (name, date, location_id, available_tickets)
-				VALUES ($1, $2, $3, $4)
+				INSERT INTO Events (name, date, price, location_id, available_tickets)
+				VALUES ($1, $2, $3, $4, $5)
 				RETURNING id
 		`
 		err = tx.QueryRow(
@@ -208,6 +215,7 @@ func CreateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			eventQuery,
 			input.Name,
 			rfc3339Date,
+			input.Price,
 			locationID,
 			input.AvailableTickets,
 		).Scan(&eventID)
@@ -240,9 +248,10 @@ func UpdateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		var input struct {
-			AvailableTickets *int    `json:"available_tickets,omitempty"`
-			Date             *string `json:"date,omitempty"`
-			Name             *string `json:"name,omitempty"`
+			AvailableTickets *int     `json:"available_tickets,omitempty"`
+			Date             *string  `json:"date,omitempty"`
+			Name             *string  `json:"name,omitempty"`
+			Price            *float64 `json:"price"`
 			Location         *struct {
 				Address  string `json:"address,omitempty"`
 				Capacity int    `json:"capacity,omitempty"`
@@ -309,6 +318,11 @@ func UpdateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 			updateQueries = append(updateQueries, fmt.Sprintf("location_id = $%d", argIndex))
 			updateArgs = append(updateArgs, locationID)
+			argIndex++
+		}
+		if input.Price != nil {
+			updateQueries = append(updateQueries, fmt.Sprintf("price = $%d", argIndex))
+			updateArgs = append(updateArgs, *input.Price)
 			argIndex++
 		}
 

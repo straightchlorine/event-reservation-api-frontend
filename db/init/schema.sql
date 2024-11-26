@@ -94,6 +94,7 @@ CREATE TABLE Events (
   id SERIAL PRIMARY KEY,
   name VARCHAR(200) NOT NULL,
   date TIMESTAMP NOT NULL CHECK (date > CURRENT_TIMESTAMP),
+  price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
   location_id INT NOT NULL,
   available_tickets INT NOT NULL CHECK (available_tickets >= 0),
   CONSTRAINT fk_event_location FOREIGN KEY (location_id) REFERENCES Locations (id) ON DELETE CASCADE
