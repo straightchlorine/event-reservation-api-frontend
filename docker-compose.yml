@@ -50,6 +50,7 @@ services:
       JWT_SECRET: ${API_JWT_SECRET}
       ROOT_NAME: ${API_ROOT_NAME}
       ROOT_PASSWORD: ${API_ROOT_PASSWORD}
+      TOKEN_VALID_HOURS: ${API_TOKEN_VALID_HOURS}
     depends_on:
       db:
         condition: service_healthy

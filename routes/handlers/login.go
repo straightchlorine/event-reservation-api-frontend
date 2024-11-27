@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -11,48 +13,60 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// LoginRequest represents the expected login payload.
+// Expected login payload.
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
-// LoginResponse represents the structure of the response for a successful login.
+// Response after a successful login.
 type LoginResponse struct {
 	Token string `json:"token"`
 }
 
-// loginHandler authenticates the user and returns a JWT.
+// Authenticate the user and return a JWT.
 func LoginHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var loginReq LoginRequest
 
+		// parse login request
 		if err := json.NewDecoder(r.Body).Decode(&loginReq); err != nil {
 			http.Error(w, "Invalid request payload", http.StatusBadRequest)
 			return
 		}
 
-		// Query the database for user details
-		var userID int
+		// query the database for user details
+		var userID string
 		var hashedPassword, role string
-		query := `SELECT u.id, u.password_hash, r.name AS role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.username = $1`
-		err := pool.QueryRow(context.Background(), query, loginReq.Username).Scan(&userID, &hashedPassword, &role)
-		if err != nil {
+		query := `
+			SELECT u.id, u.password_hash, r.name
+			FROM users u
+			JOIN roles r ON u.role_id = r.id
+			WHERE u.username = $1`
+		if err := pool.QueryRow(
+			context.Background(), query, loginReq.Username,
+		).Scan(&userID, &hashedPassword, &role); err != nil {
 			http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 			return
 		}
 
-		// Validate the provided password against the hashed password
+		// check if the password matches the hash
 		if err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(loginReq.Password)); err != nil {
 			http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 			return
 		}
 
-		// Generate a JWT for the authenticated user
+		// get the token validity duration from env variable, otherwise 24 hours
+		valid_h, err := strconv.Atoi(os.Getenv("TOKEN_VALID_HOURS"))
+		if err != nil {
+			valid_h = 24
+		}
+
+		// generate a JWT for the authenticated user
 		claims := jwt.MapClaims{
 			"userID": userID,
 			"role":   role,
-			"exp":    time.Now().Add(24 * time.Hour).Unix(), // Token expires in 24 hours
+			"exp":    time.Now().Add(time.Duration(valid_h) * time.Hour).Unix(),
 		}
 
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -63,7 +77,7 @@ func LoginHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 			return
 		}
 
-		// Send the token back to the client
+		// send the token back to client
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Authorization", "Bearer "+tokenString)
 		json.NewEncoder(w).Encode(LoginResponse{Token: tokenString})
