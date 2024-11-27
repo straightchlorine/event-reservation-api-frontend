@@ -36,7 +36,7 @@ func populateDatabase(populateFlag *bool, pool *pgxpool.Pool) {
 	} else {
 		// if the flag is not provided...
 		fmt.Println("Skipping database population, adding only admin user...")
-		err := db.AddAdminUser(nil, nil, pool)
+		err := db.AddAdminUser(nil, pool)
 		if err != nil {
 			log.Fatalf("Failed to populate the database: %v\n", err)
 		}

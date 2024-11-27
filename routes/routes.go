@@ -34,9 +34,11 @@ func SetupRoutes(pool *pgxpool.Pool, jwtSecret string) *mux.Router {
 	resRouter.HandleFunc("", handlers.CreateReservationHandler(pool)).Methods(http.MethodPut)
 	resRouter.HandleFunc("", handlers.GetReservationHandler(pool)).Methods(http.MethodGet)
 	resRouter.HandleFunc("/{id}", handlers.GetReservationByIDHandler(pool)).Methods(http.MethodGet)
-	resRouter.HandleFunc("/{id}", handlers.UpdateReservationHandler(pool)).Methods(http.MethodPut)
 	resRouter.HandleFunc("/{id}", handlers.DeleteReservationHandler(pool)).
 		Methods(http.MethodDelete)
+
+	// NOTE: for now unimplemented
+	// resRouter.HandleFunc("/{id}", handlers.UpdateReservationHandler(pool)).Methods(http.MethodPut)
 
 	eventRouter := r.PathPrefix("/api/events").Subrouter()
 	eventRouter.Use(authMiddleware)

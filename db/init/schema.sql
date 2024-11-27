@@ -40,7 +40,7 @@ CREATE TABLE Roles (
 
 -- Users Table
 CREATE TABLE Users (
-  id SERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
   name VARCHAR(100) NOT NULL,
   surname VARCHAR(100) NOT NULL,
   username VARCHAR(100) UNIQUE NOT NULL,
@@ -56,7 +56,7 @@ CREATE TABLE Users (
 -- User Authentication Logs, to track login attempts
 CREATE TABLE UserAuthLogs (
   id SERIAL PRIMARY KEY,
-  user_id INT,
+  user_id UUID NOT NULL,
   login_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   ip_address INET,
   user_agent TEXT,
@@ -109,12 +109,12 @@ CREATE TABLE ReservationStatuses (
 -- Reservations Table
 CREATE TABLE Reservations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
-  primary_user_id INT NOT NULL,
+  user_id UUID NOT NULL,
   event_id INT NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   total_tickets INT NOT NULL CHECK (total_tickets > 0),
   status_id INT NOT NULL,
-  CONSTRAINT fk_reservation_user FOREIGN KEY (primary_user_id) REFERENCES Users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_reservation_user FOREIGN KEY (user_id) REFERENCES Users (id) ON DELETE CASCADE,
   CONSTRAINT fk_reservation_event FOREIGN KEY (event_id) REFERENCES Events (id) ON DELETE CASCADE,
   CONSTRAINT fk_reservation_status FOREIGN KEY (status_id) REFERENCES ReservationStatuses (id) ON DELETE CASCADE
 );
@@ -136,12 +136,10 @@ CREATE TABLE TicketStatuses (
 -- Tickets Table
 CREATE TABLE Tickets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
-  event_id INT NOT NULL,
   reservation_id UUID,
   price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
   type_id INT NOT NULL,
   status_id INT NOT NULL,
-  CONSTRAINT fk_ticket_event FOREIGN KEY (event_id) REFERENCES Events (id) ON DELETE CASCADE,
   CONSTRAINT fk_ticket_reservation_id FOREIGN KEY (reservation_id) REFERENCES Reservations (id) ON DELETE CASCADE,
   CONSTRAINT fk_ticket_type FOREIGN KEY (type_id) REFERENCES TicketTypes (id) ON DELETE CASCADE,
   CONSTRAINT fk_ticket_status FOREIGN KEY (status_id) REFERENCES TicketStatuses (id) ON DELETE CASCADE

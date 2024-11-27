@@ -6,6 +6,58 @@ import (
 	"github.com/google/uuid"
 )
 
+// Structure of a valid reservation request
+type ReservationPayload struct {
+	EventID int `json:"event_id"`
+	Tickets []struct {
+		Type string `json:"type"`
+	} `json:"tickets"`
+}
+
+// Strudture of a valid request to the database
+type ReservationRequest struct {
+	UserID       string `json:"user_id"`
+	EventID      int    `json:"event_id"`
+	TotalTickets int    `json:"total_tickets"`
+	StatusID     int    `json:"status_id"`
+	Tickets      []struct {
+		Type string `json:"type"`
+	} `json:"tickets"`
+}
+
+// Ticket, as its returned to user
+type TicketResponse struct {
+	ID     string  `json:"id"`
+	Type   string  `json:"type"`
+	Price  float64 `json:"price"`
+	Status string  `json:"status"`
+}
+
+// Location, as its returned to user
+type LocationResponse struct {
+	Country string `json:"country"`
+	Address string `json:"address"`
+	Stadium string `json:"stadium"`
+}
+
+// Event, as its returned to user
+type EventResponse struct {
+	Name     string           `json:"name"`
+	Date     time.Time        `json:"date"`
+	Location LocationResponse `json:"location"`
+}
+
+// Reservation represents the structure of a reservation.
+type ReservationResponse struct {
+	ID           string           `json:"id"`
+	Username     string           `json:"user"`
+	CreatedAt    time.Time        `json:"created_at"`
+	TotalTickets int              `json:"total_tickets"`
+	Status       string           `json:"status"`
+	Event        EventResponse    `json:"event"`
+	Tickets      []TicketResponse `json:"tickets"`
+}
+
 // Role table record
 type Role struct {
 	ID          int    `json:"id"`
@@ -15,7 +67,7 @@ type Role struct {
 
 // User table record
 type User struct {
-	ID           int       `json:"id"`
+	ID           uuid.UUID `json:"id"`
 	Name         string    `json:"name"`
 	Surname      string    `json:"surname"`
 	Username     string    `json:"username"`
@@ -64,12 +116,12 @@ type ReservationStatus struct {
 
 // Reservation table record
 type Reservation struct {
-	ID            uuid.UUID `json:"id"`
-	PrimaryUserID int       `json:"primary_user_id"`
-	EventID       int       `json:"event_id"`
-	CreatedAt     time.Time `json:"created_at"`
-	TotalTickets  int       `json:"total_tickets"`
-	StatusID      int       `json:"status_id"`
+	ID           uuid.UUID `json:"id"`
+	UserID       uuid.UUID `json:"user_id"`
+	EventID      int       `json:"event_id"`
+	CreatedAt    time.Time `json:"created_at"`
+	TotalTickets int       `json:"total_tickets"`
+	StatusID     int       `json:"status_id"`
 }
 
 // TicketType table record
@@ -89,7 +141,6 @@ type TicketStatus struct {
 // Ticket table record
 type Ticket struct {
 	ID            int       `json:"id"`
-	EventID       int       `json:"event_id"`
 	ReservationID uuid.UUID `json:"reservation_id"`
 	Price         float64   `json:"price"`
 	TypeID        int       `json:"type_id"`

@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"errors"
 	"os"
 	"strings"
 	"time"
@@ -16,19 +15,7 @@ import (
 	"event-reservation-api/models"
 )
 
-/*
-Fetch the IDs of existing records from given table.
-
-Arguments:
-
-	ctx: context
-	pool: database connection pool
-	table: table name
-
-Returns:
-
-	[]int: list of integer IDs
-*/
+// Fetch the IDs of existing records from given table.
 func fetchIds(ctx context.Context, pool *pgxpool.Pool, table string) []int {
 	// fetch the ids from the table
 	rows, err := pool.Query(ctx, "SELECT id FROM "+table)
@@ -49,19 +36,7 @@ func fetchIds(ctx context.Context, pool *pgxpool.Pool, table string) []int {
 	return ids
 }
 
-/*
-Fetch the IDs of existing records from given table.
-
-Arguments:
-
-	ctx: context
-	pool: database connection pool
-	table: table name
-
-Returns:
-
-	[]uuid.UUID: list of UUIDs
-*/
+// Fetch the IDs of existing records from given table.
 func fetchUUIDIds(ctx context.Context, pool *pgxpool.Pool, table string) []uuid.UUID {
 	// fetch the ids from the table
 	rows, err := pool.Query(ctx, "SELECT id FROM "+table)
@@ -82,36 +57,19 @@ func fetchUUIDIds(ctx context.Context, pool *pgxpool.Pool, table string) []uuid.
 	return ids
 }
 
-/*
-Add an admin user to the database.
-
-Must contain either a batch or a pool.
-
-Arguments:
-
-	fake: A gofakeit.Faker instance (nil, if not available).
-	batch: A pgx.Batch instance (nil, if not available).
-	pool: A pgxpool.Pool instance (nil, if not available).
-
-Returns:
-
-	error: An error if the operation fails.
-*/
-func AddAdminUser(fake *gofakeit.Faker, batch *pgx.Batch, pool *pgxpool.Pool) error {
-	// check if connection to the database is provided
-	if batch == nil && pool == nil {
-		err := errors.New("Either batch or pool must be provided to add an admin user")
-		return err
-	}
+// Add an admin user to the database.
+func AddAdminUser(fake *gofakeit.Faker, pool *pgxpool.Pool) error {
 
 	// get the root user credentials from env
 	root_password := os.Getenv("ROOT_PASSWORD")
 	root_username := os.Getenv("ROOT_NAME")
 
 	// if not provided, go with root
-	if root_password == "" || root_username == "" {
-		root_username = "root"
+	if root_password == "" {
 		root_password = "root"
+	}
+	if root_username == "" {
+		root_username = "root"
 	}
 
 	// create hash from provided password
@@ -144,12 +102,10 @@ func AddAdminUser(fake *gofakeit.Faker, batch *pgx.Batch, pool *pgxpool.Pool) er
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
 	// in case nil is passed, populating is off, so run regular insert
-	if batch == nil && pool != nil {
-
+	if pool != nil {
 		_, err := pool.Query(
 			context.Background(),
 			query,
-			// root user fields
 			root_user.Name,
 			root_user.Surname,
 			root_user.Username,
@@ -164,23 +120,7 @@ func AddAdminUser(fake *gofakeit.Faker, batch *pgx.Batch, pool *pgxpool.Pool) er
 			return err
 		}
 
-	} else {
-		// append the request to the batch
-		batch.Queue(
-			query,
-			// root user fields
-			root_user.Name,
-			root_user.Surname,
-			root_user.Username,
-			root_user.Email,
-			root_user.LastLogin,
-			root_user.CreatedAt,
-			root_user.PasswordHash,
-			root_user.RoleID,
-			root_user.IsActive,
-		)
 	}
-
 	return nil
 }
 
@@ -238,7 +178,7 @@ func populateUsers(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	// if possible, take advantage of the batch request
-	err := AddAdminUser(fake, batch, nil)
+	err := AddAdminUser(fake, pool)
 	if err != nil {
 		return err
 	}
@@ -338,7 +278,7 @@ func populateReservations(ctx context.Context, pool *pgxpool.Pool) error {
 	fake := gofakeit.New(0)
 
 	// fetch user ids
-	userIDs := fetchIds(ctx, pool, "Users")
+	userIDs := fetchUUIDIds(ctx, pool, "Users")
 
 	// fetch event ids
 	eventIDs := fetchIds(ctx, pool, "Events")
@@ -357,21 +297,18 @@ func populateReservations(ctx context.Context, pool *pgxpool.Pool) error {
 
 		// fill the struct
 		reservations[i] = models.Reservation{
-			PrimaryUserID: userIDs[i%len(userIDs)],
-			EventID:       eventIDs[i%len(eventIDs)],
-			CreatedAt:     fake.PastDate(),
-			TotalTickets:  fake.Number(1, 10),
-			StatusID:      statusIDs[i%len(statusIDs)],
+			UserID:       userIDs[i%len(userIDs)],
+			EventID:      eventIDs[i%len(eventIDs)],
+			CreatedAt:    fake.PastDate(),
+			TotalTickets: fake.Number(1, 10),
+			StatusID:     statusIDs[i%len(statusIDs)],
 		}
-
-		reservation_id := uuid.New()
 
 		// fill the batch with requests
 		batch.Queue(
-			`INSERT INTO Reservations (id, primary_user_id, event_id, created_at, total_tickets, status_id)
-        VALUES ($1, $2, $3, $4, $5, $6)`,
-			reservation_id,
-			reservations[i].PrimaryUserID,
+			`INSERT INTO Reservations (user_id, event_id, created_at, total_tickets, status_id)
+        VALUES ($1, $2, $3, $4, $5)`,
+			reservations[i].UserID,
 			reservations[i].EventID,
 			reservations[i].CreatedAt,
 			reservations[i].TotalTickets,
@@ -395,9 +332,6 @@ func populateTickets(ctx context.Context, pool *pgxpool.Pool) error {
 	// ticket struct
 	tickets := make([]models.Ticket, 100)
 
-	// fetch event ids
-	eventIDs := fetchIds(ctx, pool, "Events")
-
 	// fetch reservation ids
 	reservationIDs := fetchUUIDIds(ctx, pool, "Reservations")
 
@@ -415,7 +349,6 @@ func populateTickets(ctx context.Context, pool *pgxpool.Pool) error {
 
 		// fill the struct
 		tickets[i] = models.Ticket{
-			EventID:       eventIDs[i%len(eventIDs)],
 			ReservationID: reservationIDs[i%len(reservationIDs)],
 			Price:         fake.Price(10, 1000),
 			TypeID:        ticketTypeIDs[i%len(ticketTypeIDs)],
@@ -424,9 +357,8 @@ func populateTickets(ctx context.Context, pool *pgxpool.Pool) error {
 
 		// fill the batch with requests
 		batch.Queue(
-			`INSERT INTO Tickets (event_id, reservation_id, price, type_id, status_id)
-        VALUES ($1, $2, $3, $4, $5)`,
-			tickets[i].EventID,
+			`INSERT INTO Tickets (reservation_id, price, type_id, status_id)
+        VALUES ($1, $2, $3, $4)`,
 			tickets[i].ReservationID,
 			tickets[i].Price,
 			tickets[i].TypeID,
@@ -442,17 +374,7 @@ func populateTickets(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
-/*
-Populate the database with fake data.
-
-Arguments:
-
-	pool: A connection pool to the database.
-
-Returns:
-
-	error: An error if the operation fails.
-*/
+// Populate the database with fake data.
 func PopulateDatabase(pool *pgxpool.Pool) error {
 	// conte  // context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)

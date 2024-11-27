@@ -6,9 +6,75 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"event-reservation-api/models"
 )
 
-// CreateReservationHandler handles the creation of reservations and associated tickets.
+// Fetch all reservations with associated ticket details.
+func GetReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// fetch all data associated with reservations
+		query := `
+			SELECT r.id, u.username, r.created_at, r.total_tickets, rs.name,
+				e.name, e.date, l.country, l.address, l.stadium
+			FROM Reservations r
+			JOIN ReservationStatuses rs ON r.status_id = rs.id
+			JOIN Users u ON r.user_id = u.id
+			JOIN Events e ON r.event_id = e.id
+			JOIN Locations l ON e.location_id = l.id
+		`
+		rows, err := pool.Query(r.Context(), query)
+		if err != nil {
+			handleError(w, http.StatusInternalServerError, "Failed to fetch reservations", err)
+			return
+		}
+		defer rows.Close()
+
+		// build the response data
+		reservations := []models.ReservationResponse{}
+		for rows.Next() {
+			var res models.ReservationResponse
+			var location models.LocationResponse
+			var event models.EventResponse
+
+			// scan the rows
+			err := rows.Scan(
+				&res.ID,
+				&res.Username,
+				&res.CreatedAt,
+				&res.TotalTickets,
+				&res.Status,
+				&event.Name,
+				&event.Date,
+				&location.Country,
+				&location.Address,
+				&location.Stadium,
+			)
+			if err != nil {
+				handleError(w, http.StatusInternalServerError, "Failed to parse reservation", err)
+				return
+			}
+
+			// append the data to the response
+			event.Location = location
+			res.Event = event
+
+			// fetch tickets attributed to the reservation
+			tickets, err := fetchTicketsForReservation(r.Context(), pool, res.ID)
+			if err != nil {
+				handleError(w, http.StatusInternalServerError, "Failed to fetch tickets", err)
+				return
+			}
+
+			// append to the response
+			res.Tickets = tickets
+			reservations = append(reservations, res)
+		}
+		writeJSONResponse(w, http.StatusOK, reservations)
+	}
+}
+
+// Create a reservation along with with associated tickets.
 func CreateReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !isRegistered(r) {
@@ -16,22 +82,32 @@ func CreateReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		var reservationRequest struct {
-			PrimaryUserID int `json:"primary_user_id"`
-			EventID       int `json:"event_id"`
-			TotalTickets  int `json:"total_tickets"`
-			Tickets       []struct {
-				Type string `json:"type"`
-			} `json:"tickets"`
+		// get the user identifier of the logged in user
+		userId, err := getUserIDFromContext(r.Context())
+		if err != nil {
+			handleError(
+				w,
+				http.StatusInternalServerError,
+				"Failed to fetch the user identifier",
+				nil,
+			)
+			return
 		}
 
-		// parse the request body
-		if err := json.NewDecoder(r.Body).Decode(&reservationRequest); err != nil {
+		// decode the request body
+		var resPayload models.ReservationPayload
+		if err := json.NewDecoder(r.Body).Decode(&resPayload); err != nil {
 			handleError(w, http.StatusBadRequest, "Invalid JSON input", err)
 			return
 		}
 
-		// start database transaction
+		// validate the request
+		if err := validateReservationRequest(resPayload); err != nil {
+			handleError(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		// begin database transaction
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
 			handleError(w, http.StatusInternalServerError, "Failed to start transaction", err)
@@ -39,80 +115,87 @@ func CreateReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
-		// fetch the base price of the event
-		price, err := getEventBasePrice(r, tx, reservationRequest.EventID)
-		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to fetch event base price", nil)
-		}
+		// fetch reservation details
+		var req models.ReservationRequest
+		basePrice, availableTickets, statusID, err := fetchReservationDetails(
+			r,
+			tx,
+			"PENDING", // will be updated after inserting the tickets
+			resPayload.EventID,
+		)
 
-		// fetch the available tickets
-		availableTickets, err := getEventAvailableTickets(r, tx, reservationRequest.EventID)
-		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Unable to fetch available tickets", nil)
-		}
-
-		if availableTickets < reservationRequest.TotalTickets {
-			handleError(w, http.StatusBadRequest, "Not enough tickets available", nil)
-		}
-
-		reservationStatusID, err := fetchReservationStatus(r, tx, "CONFIRMED")
 		if err != nil {
 			handleError(
 				w,
 				http.StatusInternalServerError,
-				"Failed to fetch reservation status",
-				nil,
+				"Failed to fetch reservation details",
+				err,
 			)
+			return
 		}
 
+		// assign already fetched values to the request struct
+		req.UserID = userId
+		req.EventID = resPayload.EventID
+		req.TotalTickets = len(resPayload.Tickets)
+		req.StatusID = statusID
+
+		// check if there is enough tickets available
+		if availableTickets < req.TotalTickets {
+			handleError(w, http.StatusBadRequest, "Not enough tickets available", nil)
+			return
+		}
+
+		substractTicketsFromEvent(r.Context(), tx, req.EventID, req.TotalTickets)
+
 		// insert a reservation
-		var reservationID string
+		var reservationId string
 		reservationQuery := `
-            INSERT INTO Reservations (primary_user_id, event_id, total_tickets, status_id)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id`
-		err = tx.QueryRow(r.Context(), reservationQuery,
-			reservationRequest.PrimaryUserID,
-			reservationRequest.EventID,
-			reservationRequest.TotalTickets,
-			reservationStatusID,
-		).Scan(&reservationID)
+			INSERT INTO Reservations (user_id, event_id, total_tickets, status_id)
+			VALUES ($1, $2, $3, $4)
+			RETURNING id
+		`
+		err = tx.QueryRow(r.Context(),
+			reservationQuery,
+			req.UserID,
+			req.EventID,
+			req.TotalTickets,
+			req.StatusID,
+		).Scan(&reservationId)
+
 		if err != nil {
 			handleError(w, http.StatusInternalServerError, "Failed to create reservation", err)
 			return
 		}
 
-		// create an appropriate amount of tickets
 		ticketQuery := `
-            INSERT INTO Tickets (event_id, reservation_id, price, type_id, status_id)
-            VALUES ($1, $2, $3, $4, $5)`
-		for _, ticket := range reservationRequest.Tickets {
-			discount, err := fetchTicketDiscount(r, tx, ticket.Type)
+			INSERT INTO Tickets (reservation_id, price, type_id, status_id)
+			VALUES ($1, $2, $3, $4)
+		`
+		// insert the reserved tickets
+		for _, ticket := range resPayload.Tickets {
+			discount, typeId, statusId, err := fetchTicketDetails(
+				r.Context(),
+				tx,
+				"RESERVED",
+				ticket.Type,
+			)
 			if err != nil {
 				handleError(
 					w,
 					http.StatusInternalServerError,
-					"Failed to fetch ticket discount",
+					"Failed to fetch ticket details",
 					nil,
 				)
+				return
 			}
 
-			typeID, err := fetchTicketType(r, tx, ticket.Type)
-			if err != nil {
-				handleError(w, http.StatusInternalServerError, "Failed to fetch ticket type", nil)
-			}
-
-			statusID, err := fetchTicketStatus(r, tx, "RESERVED")
-			if err != nil {
-				handleError(w, http.StatusInternalServerError, "Failed to fetch ticket status", nil)
-			}
-
+			// execute the insert query
 			_, err = tx.Exec(r.Context(), ticketQuery,
-				reservationRequest.EventID,
-				reservationID,
-				price*(1-discount),
-				typeID,
-				statusID,
+				reservationId,
+				basePrice*(1-discount),
+				typeId,
+				statusId,
 			)
 			if err != nil {
 				handleError(w, http.StatusInternalServerError, "Failed to create tickets", err)
@@ -120,262 +203,87 @@ func CreateReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		// Commit transaction
+		err = confirmReservation(r.Context(), tx, reservationId)
+		if err != nil {
+			handleError(w, http.StatusInternalServerError, "Failed to confirm reservation", err)
+		}
+
+		// commit the transaction
 		if err := tx.Commit(r.Context()); err != nil {
 			handleError(w, http.StatusInternalServerError, "Failed to commit transaction", err)
 			return
 		}
 
-		// Respond with the reservation ID
-		writeJSONResponse(w, http.StatusCreated, map[string]string{"reservation_id": reservationID})
+		// respond with the reservation ID
+		writeJSONResponse(
+			w,
+			http.StatusCreated,
+			map[string]string{
+				"message":        "Created reservation successfully",
+				"reservation_id": reservationId,
+			},
+		)
 	}
 }
 
-func GetReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// // Parse pagination parameters
-		// query := r.URL.Query()
-		// limit := 10
-		// offset := 0
-		// if qLimit := query.Get("limit"); qLimit != "" {
-		// 	if l, err := strconv.Atoi(qLimit); err == nil && l > 0 {
-		// 		limit = l
-		// 	}
-		// }
-		// if qOffset := query.Get("offset"); qOffset != "" {
-		// 	if o, err := strconv.Atoi(qOffset); err == nil && o >= 0 {
-		// 		offset = o
-		// 	}
-		// }
-		//
-		// Fetch reservations
-		reservationsQuery := `
-			SELECT r.id, r.primary_user_id, r.event_id, r.total_tickets, s.name as status
-			FROM Reservations r
-			JOIN ReservationStatuses s ON r.status_id = s.id
-			ORDER BY r.id`
-		// LIMIT $1 OFFSET $2`
-		rows, err := pool.Query(r.Context(), reservationsQuery) //, limit, offset)
-		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to fetch reservations", err)
-			return
-		}
-		defer rows.Close()
-
-		var reservations []struct {
-			ID            string `json:"id"`
-			PrimaryUserID int    `json:"primary_user_id"`
-			EventID       int    `json:"event_id"`
-			TotalTickets  int    `json:"total_tickets"`
-			Status        string `json:"status"`
-			Tickets       []struct {
-				ID     string  `json:"id"`
-				Type   string  `json:"type"`
-				Price  float64 `json:"price"`
-				Status string  `json:"status"`
-			} `json:"tickets"`
-		}
-
-		// Iterate over each reservation
-		for rows.Next() {
-			var reservation struct {
-				ID            string `json:"id"`
-				PrimaryUserID int    `json:"primary_user_id"`
-				EventID       int    `json:"event_id"`
-				TotalTickets  int    `json:"total_tickets"`
-				Status        string `json:"status"`
-				Tickets       []struct {
-					ID     string  `json:"id"`
-					Type   string  `json:"type"`
-					Price  float64 `json:"price"`
-					Status string  `json:"status"`
-				} `json:"tickets"`
-			}
-
-			if err := rows.Scan(
-				&reservation.ID, &reservation.PrimaryUserID,
-				&reservation.EventID, &reservation.TotalTickets, &reservation.Status,
-			); err != nil {
-				handleError(
-					w,
-					http.StatusInternalServerError,
-					"Failed to parse reservation data",
-					err,
-				)
-				return
-			}
-
-			// Fetch associated tickets
-			ticketsQuery := `
-				SELECT t.id, tt.name as type, t.price, ts.name as status
-				FROM Tickets t
-				JOIN TicketTypes tt ON t.type_id = tt.id
-				JOIN TicketStatuses ts ON t.status_id = ts.id
-				WHERE t.reservation_id = $1`
-			ticketRows, err := pool.Query(r.Context(), ticketsQuery, reservation.ID)
-			if err != nil {
-				handleError(w, http.StatusInternalServerError, "Failed to fetch tickets", err)
-				return
-			}
-			defer ticketRows.Close()
-
-			for ticketRows.Next() {
-				var ticket struct {
-					ID     string  `json:"id"`
-					Type   string  `json:"type"`
-					Price  float64 `json:"price"`
-					Status string  `json:"status"`
-				}
-				if err := ticketRows.Scan(&ticket.ID, &ticket.Type, &ticket.Price, &ticket.Status); err != nil {
-					handleError(
-						w,
-						http.StatusInternalServerError,
-						"Failed to parse ticket data",
-						err,
-					)
-					return
-				}
-				reservation.Tickets = append(reservation.Tickets, ticket)
-			}
-
-			reservations = append(reservations, reservation)
-		}
-
-		if rows.Err() != nil {
-			handleError(
-				w,
-				http.StatusInternalServerError,
-				"Error occurred while iterating reservations",
-				rows.Err(),
-			)
-			return
-		}
-
-		// Respond with the list of reservations
-		writeJSONResponse(w, http.StatusOK, reservations)
-	}
-}
-
+// Fetch a reservation by ID.
 func GetReservationByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// parse the user id from the url
-		vars := mux.Vars(r)
-		id, ok := vars["id"]
-		if !ok {
-			handleError(w, http.StatusBadRequest, "User ID not provided in the query", nil)
-			return
-		}
+		reservationId := mux.Vars(r)["id"]
 
-		var reservation struct {
-			ID            string `json:"id"`
-			PrimaryUserID int    `json:"primary_user_id"`
-			EventID       int    `json:"event_id"`
-			TotalTickets  int    `json:"total_tickets"`
-			Status        string `json:"status"`
-			Tickets       []struct {
-				ID     string  `json:"id"`
-				Type   string  `json:"type"`
-				Price  float64 `json:"price"`
-				Status string  `json:"status"`
-			} `json:"tickets"`
-		}
+		var res models.ReservationResponse
+		var location models.LocationResponse
+		var event models.EventResponse
 
-		// Fetch reservation details
-		reservationQuery := `
-            SELECT r.id, r.primary_user_id, r.event_id, r.total_tickets, s.name as status
-            FROM Reservations r
-            JOIN ReservationStatuses s ON r.status_id = s.id
-            WHERE r.id = $1`
-		err := pool.QueryRow(r.Context(), reservationQuery, id).Scan(
-			&reservation.ID, &reservation.PrimaryUserID, &reservation.EventID,
-			&reservation.TotalTickets, &reservation.Status,
-		)
-		if err != nil {
+		// fetch the reservation details
+		query := `
+			SELECT r.id, u.username, r.created_at, r.total_tickets, rs.name,
+				e.name, e.date, l.country, l.address, l.stadium
+			FROM Reservations r
+			JOIN ReservationStatuses rs ON r.status_id = rs.id
+			JOIN Users u ON r.user_id = u.id
+			JOIN Events e ON r.event_id = e.id
+			JOIN Locations l ON e.location_id = l.id
+			WHERE r.id = $1
+		`
+		if err := pool.QueryRow(r.Context(), query, reservationId).Scan(
+			&res.ID,
+			&res.Username,
+			&res.CreatedAt,
+			&res.TotalTickets,
+			&res.Status,
+			&event.Name,
+			&event.Date,
+			&location.Country,
+			&location.Address,
+			&location.Stadium,
+		); err != nil {
 			handleError(w, http.StatusNotFound, "Reservation not found", err)
 			return
 		}
 
-		// Fetch associated tickets
-		ticketsQuery := `
-            SELECT t.id, tt.name as type, t.price, ts.name as status
-            FROM Tickets t
-            JOIN TicketTypes tt ON t.type_id = tt.id
-            JOIN TicketStatuses ts ON t.status_id = ts.id
-            WHERE t.reservation_id = $1`
-		rows, err := pool.Query(r.Context(), ticketsQuery, id)
+		// fetch the tickets associated with the reservation
+		tickets, err := fetchTicketsForReservation(r.Context(), pool, res.ID)
 		if err != nil {
 			handleError(w, http.StatusInternalServerError, "Failed to fetch tickets", err)
 			return
 		}
-		defer rows.Close()
 
-		for rows.Next() {
-			var ticket struct {
-				ID     string  `json:"id"`
-				Type   string  `json:"type"`
-				Price  float64 `json:"price"`
-				Status string  `json:"status"`
-			}
-			if err := rows.Scan(&ticket.ID, &ticket.Type, &ticket.Price, &ticket.Status); err != nil {
-				handleError(w, http.StatusInternalServerError, "Failed to parse ticket data", err)
-				return
-			}
-			reservation.Tickets = append(reservation.Tickets, ticket)
-		}
+		// append to the response
+		event.Location = location
+		res.Tickets = tickets
+		res.Event = event
 
-		writeJSONResponse(w, http.StatusOK, reservation)
+		writeJSONResponse(w, http.StatusOK, res)
 	}
 }
 
-func UpdateReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// parse the user id from the url
-		vars := mux.Vars(r)
-		reservationId, ok := vars["id"]
-		if !ok {
-			handleError(w, http.StatusBadRequest, "User ID not provided in the query", nil)
-			return
-		}
+// TODO: Maybe implement also update handler, for now skipped.
 
-		var updateRequest struct {
-			Status string `json:"status"`
-		}
-
-		if err := json.NewDecoder(r.Body).Decode(&updateRequest); err != nil {
-			handleError(w, http.StatusBadRequest, "Invalid JSON input", err)
-			return
-		}
-
-		statusID, err := fetchReservationStatusPool(r, pool, updateRequest.Status)
-		if err != nil {
-			handleError(w, http.StatusBadRequest, "Invalid status", err)
-			return
-		}
-
-		query := `UPDATE Reservations SET status_id = $1 WHERE id = $2`
-		_, err = pool.Exec(r.Context(), query, statusID, reservationId)
-		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to update reservation", err)
-			return
-		}
-
-		writeJSONResponse(
-			w,
-			http.StatusOK,
-			map[string]string{"message": "Reservation updated successfully"},
-		)
-	}
-}
-
+// Delete a reservation and its associated tickets.
 func DeleteReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// parse the user id from the url
-		vars := mux.Vars(r)
-		id, ok := vars["id"]
-		if !ok {
-			handleError(w, http.StatusBadRequest, "User ID not provided in the query", nil)
-			return
-		}
+		reservationId := mux.Vars(r)["id"]
 
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
@@ -384,18 +292,31 @@ func DeleteReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
-		// Delete tickets associated with the reservation
-		ticketsQuery := `DELETE FROM Tickets WHERE reservation_id = $1`
-		_, err = tx.Exec(r.Context(), ticketsQuery, id)
-		if err != nil {
+		// Verify if the reservation exists
+		var exists bool
+		checkReservationQuery := `SELECT EXISTS(SELECT 1 FROM Reservations WHERE id = $1)`
+		if err := tx.QueryRow(r.Context(), checkReservationQuery, reservationId).Scan(&exists); err != nil {
+			handleError(
+				w,
+				http.StatusInternalServerError,
+				"Failed to verify reservation existence",
+				err,
+			)
+			return
+		}
+		if !exists {
+			handleError(w, http.StatusNotFound, "Reservation not found", nil)
+			return
+		}
+
+		deleteTicketsQuery := `DELETE FROM Tickets WHERE reservation_id = $1`
+		if _, err := tx.Exec(r.Context(), deleteTicketsQuery, reservationId); err != nil {
 			handleError(w, http.StatusInternalServerError, "Failed to delete tickets", err)
 			return
 		}
 
-		// Delete the reservation
-		reservationQuery := `DELETE FROM Reservations WHERE id = $1`
-		_, err = tx.Exec(r.Context(), reservationQuery, id)
-		if err != nil {
+		deleteReservationQuery := `DELETE FROM Reservations WHERE id = $1`
+		if _, err := tx.Exec(r.Context(), deleteReservationQuery, reservationId); err != nil {
 			handleError(w, http.StatusInternalServerError, "Failed to delete reservation", err)
 			return
 		}
@@ -405,10 +326,9 @@ func DeleteReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		writeJSONResponse(
-			w,
-			http.StatusOK,
-			map[string]string{"message": "Reservation deleted successfully"},
-		)
+		writeJSONResponse(w, http.StatusOK,
+			map[string]string{
+				"message": "Reservation deleted successfully",
+			})
 	}
 }

@@ -12,97 +12,191 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"event-reservation-api/middlewares"
+	"event-reservation-api/models"
 )
 
-func fetchTicketStatus(
-	r *http.Request,
+func confirmReservation(
+	ctx context.Context,
 	tx pgx.Tx,
-	statusName string) (int, error) {
-	var statusID int
-	query := "SELECT id FROM ticketstatuses WHERE name = $1"
-	err := tx.QueryRow(r.Context(), query, statusName).Scan(&statusID)
+	reservationId string) error {
+
+	err := updateReservationStatus(ctx, tx, reservationId, "CONFIRMED")
 	if err != nil {
-		return -1, fmt.Errorf("Unable to fetch ticket status: %w", err)
+		return fmt.Errorf("Failed to update reservation status: %w", err)
 	}
-	return statusID, nil
+
+	err = updateTicketsStatus(ctx, tx, reservationId, "SOLD")
+	if err != nil {
+		return fmt.Errorf("Failed to update ticket status: %w", err)
+	}
+	return nil
 }
 
-func fetchTicketDiscount(
-	r *http.Request,
+// Update the status of a reservation.
+func updateTicketsStatus(
+	ctx context.Context,
 	tx pgx.Tx,
-	ticketType string) (float64, error) {
+	resId string,
+	status string) error {
+
+	query := `
+		UPDATE Tickets
+		SET status_id = (
+			SELECT id
+			FROM ticketstatuses
+			WHERE name = $1
+			LIMIT 1
+		)
+		WHERE reservation_id = $2
+	`
+	_, err := tx.Exec(ctx, query, status, resId)
+	if err != nil {
+		return fmt.Errorf("failed to update reservation status: %w", err)
+	}
+	return nil
+}
+
+// Update the status of a reservation.
+func updateReservationStatus(
+	ctx context.Context,
+	tx pgx.Tx,
+	resId string,
+	status string) error {
+
+	query := `
+		UPDATE reservations
+		SET status_id = (
+			SELECT id
+			FROM reservationstatuses
+			WHERE name = $1
+			LIMIT 1
+		)
+		WHERE id = $2
+	`
+	_, err := tx.Exec(ctx, query, status, resId)
+	if err != nil {
+		return fmt.Errorf("failed to update reservation status: %w", err)
+	}
+	return nil
+}
+
+func substractTicketsFromEvent(
+	ctx context.Context,
+	tx pgx.Tx,
+	eventID int,
+	tickets int) error {
+
+	query := `
+		UPDATE events
+		SET available_tickets = $2
+		WHERE id = $1
+	`
+	_, err := tx.Exec(ctx, query, eventID, tickets)
+	if err != nil {
+		return fmt.Errorf("Failed to update available tickets for event %d: %w", eventID, err)
+	}
+
+	return nil
+}
+
+func fetchTicketDetails(
+	ctx context.Context,
+	tx pgx.Tx,
+	ticketStatus string,
+	ticketType string) (float64, int, int, error) {
+	query := `
+		SELECT
+			tt.discount,
+			tt.id,
+			ts.id
+		FROM tickettypes tt
+		JOIN ticketstatuses ts ON ts.name = $2
+		WHERE tt.name = $1
+	`
 	var discount float64
-	query := "SELECT discount FROM tickettypes WHERE name = $1"
-	err := tx.QueryRow(r.Context(), query, ticketType).Scan(&discount)
+	var typeId int
+	var statusId int
+
+	err := tx.QueryRow(ctx, query, ticketType, ticketStatus).
+		Scan(&discount, &typeId, &statusId)
 	if err != nil {
-		return -1, fmt.Errorf("Unable to fetch discount: %w", err)
+		return 0.0, 0, 0, fmt.Errorf("Failed to fetch reservation details: %w", err)
 	}
-	return discount, nil
+
+	return discount, typeId, statusId, nil
 }
 
-func fetchTicketType(
+// Fetch the details required for creating a reservation.
+//
+// This involves base price, available tickets as well as the id of the
+// reservation status
+func fetchReservationDetails(
 	r *http.Request,
 	tx pgx.Tx,
-	statusName string) (int, error) {
-	var statusID int
-	query := "SELECT id FROM tickettypes WHERE name = $1"
-	err := tx.QueryRow(r.Context(), query, statusName).Scan(&statusID)
-	if err != nil {
-		return -1, fmt.Errorf("Unable to fetch ticket type: %w", err)
-	}
-	return statusID, nil
-}
-
-func fetchReservationStatusPool(
-	r *http.Request,
-	pool *pgxpool.Pool,
-	statusName string) (int, error) {
-	var statusID int
-	query := "SELECT id FROM reservationstatuses WHERE name = $1"
-	err := pool.QueryRow(r.Context(), query, statusName).Scan(&statusID)
-	if err != nil {
-		return -1, fmt.Errorf("Unable to fetch status id: %w", err)
-	}
-	return statusID, nil
-}
-
-func fetchReservationStatus(
-	r *http.Request,
-	tx pgx.Tx,
-	statusName string) (int, error) {
-	var statusID int
-	query := "SELECT id FROM reservationstatuses WHERE name = $1"
-	err := tx.QueryRow(r.Context(), query, statusName).Scan(&statusID)
-	if err != nil {
-		return -1, fmt.Errorf("Unable to fetch status id: %w", err)
-	}
-	return statusID, nil
-}
-
-func getEventAvailableTickets(
-	r *http.Request,
-	tx pgx.Tx,
-	eventID int) (int, error) {
+	status string,
+	eventID int) (float64, int, int, error) {
+	query := `
+		SELECT
+			e.price,
+			e.available_tickets,
+			rs.id
+		FROM events e
+		JOIN reservationstatuses rs ON rs.name = $2
+		WHERE e.id = $1
+	`
+	var basePrice float64
 	var availableTickets int
-	query := "SELECT available_tickets FROM events WHERE id = $1"
-	err := tx.QueryRow(r.Context(), query, eventID).Scan(&availableTickets)
+	var statusID int
+
+	err := tx.QueryRow(r.Context(), query, eventID, status).
+		Scan(&basePrice, &availableTickets, &statusID)
 	if err != nil {
-		return 0.0, fmt.Errorf("Unable to fetch available tickets: %w", err)
+		return 0.0, 0, 0, fmt.Errorf("Failed to fetch reservation details: %w", err)
 	}
-	return availableTickets, nil
+
+	return basePrice, availableTickets, statusID, nil
 }
 
-func getEventBasePrice(
-	r *http.Request,
-	tx pgx.Tx,
-	eventID int) (float64, error) {
-	var eventBasePrice float64
-	query := "SELECT price FROM events WHERE id = $1"
-	err := tx.QueryRow(r.Context(), query, eventID).Scan(&eventBasePrice)
-	if err != nil {
-		return 0.0, fmt.Errorf("Unable to fetch event base price: %w", err)
+// Validate the reservation request payload.
+func validateReservationRequest(req models.ReservationPayload) error {
+	if req.EventID <= 0 {
+		return fmt.Errorf("Invalid input: ensure all fields are non-negative")
 	}
-	return eventBasePrice, nil
+	return nil
+}
+
+// Fetch tickets for a reservation
+func fetchTicketsForReservation(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	reservationID string,
+) ([]models.TicketResponse, error) {
+	query := `
+		SELECT t.id, t.price, ts.name AS status, tt.name AS type
+		FROM Tickets t
+		JOIN TicketStatuses ts ON t.status_id = ts.id
+		JOIN TicketTypes tt ON t.type_id = tt.id
+		WHERE t.reservation_id = $1
+	`
+
+	rows, err := pool.Query(ctx, query, reservationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// build the list of tickets attributed to the reservation
+	tickets := []models.TicketResponse{}
+	for rows.Next() {
+		var ticket models.TicketResponse
+		err := rows.Scan(&ticket.ID, &ticket.Price, &ticket.Status, &ticket.Type)
+		if err != nil {
+			return nil, err
+		}
+		tickets = append(tickets, ticket)
+	}
+
+	return tickets, nil
 }
 
 // Utility to check if a location exists within the database.
@@ -243,6 +337,19 @@ func isRegistered(r *http.Request) bool {
 	}
 	role, ok := claims["role"].(string)
 	return ok && (role == "REGISTERED" || role == "ADMIN")
+}
+
+// Get user UUID from the request context.
+func getUserIDFromContext(ctx context.Context) (string, error) {
+	claims, err := middlewares.GetClaimsFromContext(ctx)
+	if err != nil {
+		return "", err
+	}
+	userId, ok := claims["userID"].(string)
+	if !ok {
+		return "", fmt.Errorf("Unable to extract userId from request context")
+	}
+	return userId, nil
 }
 
 // Fetch the role name associated with a given role ID.
