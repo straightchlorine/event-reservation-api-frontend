@@ -21,11 +21,13 @@ func SetupRoutes(pool *pgxpool.Pool, jwtSecret string) *mux.Router {
 
 	r.HandleFunc("/api/events", handlers.GetEventsHandler(pool)).Methods(http.MethodGet)
 	r.HandleFunc("/api/events/{id}", handlers.GetEventByIDHandler(pool)).Methods(http.MethodGet)
+	r.HandleFunc("/api/locations", handlers.GetLocationsHandler(pool)).Methods(http.MethodGet)
+	r.HandleFunc("/api/locations/{id}", handlers.GetLocationByIDHandler(pool)).
+		Methods(http.MethodGet)
 
 	locRouter := r.PathPrefix("/api/locations").Subrouter()
+	locRouter.Use(authMiddleware)
 	locRouter.HandleFunc("", handlers.CreateLocationHandler(pool)).Methods(http.MethodPut)
-	locRouter.HandleFunc("", handlers.GetLocationsHandler(pool)).Methods(http.MethodGet)
-	locRouter.HandleFunc("/{id}", handlers.GetLocationByIDHandler(pool)).Methods(http.MethodGet)
 	locRouter.HandleFunc("/{id}", handlers.UpdateLocationHandler(pool)).Methods(http.MethodPut)
 	locRouter.HandleFunc("/{id}", handlers.DeleteLocationHandler(pool)).Methods(http.MethodDelete)
 

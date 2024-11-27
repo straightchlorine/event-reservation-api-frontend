@@ -13,17 +13,15 @@ import (
 	"event-reservation-api/models"
 )
 
-// Get all locations
+// Fetch all locations from the database.
 func GetLocationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		query := `SELECT
-				id,
-				stadium,
-				address,
-				country,
-				capacity
+		query := `
+			SELECT
+				id, stadium, address, country, capacity
 			FROM Locations
-			ORDER BY stadium ASC`
+			ORDER BY id ASC
+		`
 
 		rows, err := pool.Query(r.Context(), query)
 		if err != nil {
@@ -61,7 +59,7 @@ func GetLocationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-// Retrieve a location by ID
+// Retrieve a single location by ID
 func GetLocationByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
@@ -112,31 +110,25 @@ func GetLocationByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 // Create a new location
 func CreateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Check if the user is an admin
 		if !isAdmin(r) {
 			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
 			return
 		}
 
-		var input struct {
-			Stadium  string `json:"stadium"`
-			Address  string `json:"address"`
-			Country  string `json:"country,omitempty"`
-			Capacity int    `json:"capacity"`
-		}
-		// Decode the input
+		// decode the request body
+		input := models.LocationPayload{}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			handleError(w, http.StatusBadRequest, "Invalid JSON input", err)
 			return
 		}
 
-		// Validate required fields
+		// validate fields
 		if input.Stadium == "" || input.Address == "" || input.Capacity <= 0 {
 			handleError(w, http.StatusBadRequest, "Missing or invalid fields", nil)
 			return
 		}
 
-		// If country is not provided, set it to empty string
+		// set default value for country
 		if input.Country == "" {
 			input.Country = ""
 		}
@@ -171,13 +163,13 @@ func CreateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 // Update an existing location
 func UpdateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Check if the user is an admin
+		// check if the user is an admin
 		if !isAdmin(r) {
 			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
 			return
 		}
 
-		// Parse the location ID from the URL
+		// parse the location ID from the URL
 		vars := mux.Vars(r)
 		locationID, ok := vars["id"]
 		if !ok {
@@ -185,21 +177,14 @@ func UpdateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// Struct for the request payload
-		var input struct {
-			Stadium  *string `json:"stadium,omitempty"`
-			Address  *string `json:"address,omitempty"`
-			Country  *string `json:"country,omitempty"`
-			Capacity *int    `json:"capacity,omitempty"`
-		}
-
-		// Decode the body and parse the request
+		// decode the body and parse the request
+		input := models.LocationUpdatePayload{}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			handleError(w, http.StatusBadRequest, "Invalid JSON input", err)
 			return
 		}
 
-		// Building the update query dynamically
+		// building the update query dynamically
 		query := `UPDATE Locations SET `
 		args := []interface{}{}
 		idx := 1
@@ -225,24 +210,24 @@ func UpdateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			idx++
 		}
 
-		// If no fields to update
+		// if no fields to update
 		if len(args) == 0 {
 			handleError(w, http.StatusBadRequest, "No fields to update", nil)
 			return
 		}
 
-		// Remove trailing comma and add where clause
+		// remove trailing comma and add where clause
 		query = strings.TrimSuffix(query, ", ") + fmt.Sprintf(" WHERE id = $%d", idx)
 		args = append(args, locationID)
 
-		// Execute the query
+		// execute the query
 		_, err := pool.Exec(r.Context(), query, args...)
 		if err != nil {
 			handleError(w, http.StatusInternalServerError, "Failed to update location", err)
 			return
 		}
 
-		// Write response
+		// send the response
 		writeJSONResponse(w, http.StatusOK, map[string]string{
 			"message": "Location updated successfully",
 		})

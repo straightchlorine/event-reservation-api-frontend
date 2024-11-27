@@ -33,6 +33,20 @@ type TicketResponse struct {
 	Status string  `json:"status"`
 }
 
+type LocationPayload struct {
+	Stadium  string `json:"stadium,omitempty"`
+	Address  string `json:"address"`
+	Country  string `json:"country,omitempty"`
+	Capacity int    `json:"capacity,omitempty"`
+}
+
+type LocationUpdatePayload struct {
+	Stadium  *string `json:"stadium,omitempty"`
+	Address  *string `json:"address,omitempty"`
+	Country  *string `json:"country,omitempty"`
+	Capacity *int    `json:"capacity,omitempty"`
+}
+
 // Location, as its returned to user
 type LocationResponse struct {
 	Country string `json:"country"`
