@@ -6,6 +6,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// Token blacklist entry
+type BlacklistEntry struct {
+	Token     string
+	ExpiresAt time.Time
+}
+
 // Structure of a valid reservation request
 type ReservationPayload struct {
 	EventID int `json:"event_id"`

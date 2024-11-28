@@ -18,7 +18,7 @@ func GetReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			SELECT r.id, u.username, r.created_at, r.total_tickets, rs.name,
 				e.name, e.date, l.country, l.address, l.stadium
 			FROM Reservations r
-			JOIN ReservationStatuses rs ON r.status_id = rs.id
+			JOIN reservation_statuses rs ON r.status_id = rs.id
 			JOIN Users u ON r.user_id = u.id
 			JOIN Events e ON r.event_id = e.id
 			JOIN Locations l ON e.location_id = l.id
@@ -240,7 +240,7 @@ func GetReservationByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			SELECT r.id, u.username, r.created_at, r.total_tickets, rs.name,
 				e.name, e.date, l.country, l.address, l.stadium
 			FROM Reservations r
-			JOIN ReservationStatuses rs ON r.status_id = rs.id
+			JOIN reservation_statuses rs ON r.status_id = rs.id
 			JOIN Users u ON r.user_id = u.id
 			JOIN Events e ON r.event_id = e.id
 			JOIN Locations l ON e.location_id = l.id

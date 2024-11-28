@@ -284,7 +284,7 @@ func populateReservations(ctx context.Context, pool *pgxpool.Pool) error {
 	eventIDs := fetchIds(ctx, pool, "Events")
 
 	// fetch status ids
-	statusIDs := fetchIds(ctx, pool, "ReservationStatuses")
+	statusIDs := fetchIds(ctx, pool, "reservation_statuses")
 
 	// reservation struct
 	reservations := make([]models.Reservation, 100)
@@ -336,10 +336,10 @@ func populateTickets(ctx context.Context, pool *pgxpool.Pool) error {
 	reservationIDs := fetchUUIDIds(ctx, pool, "Reservations")
 
 	// fetch ticket type ids
-	ticketTypeIDs := fetchIds(ctx, pool, "TicketTypes")
+	ticketTypeIDs := fetchIds(ctx, pool, "ticket_types")
 
 	// fetch ticket status ids
-	ticketStatusIDs := fetchIds(ctx, pool, "TicketStatuses")
+	ticketStatusIDs := fetchIds(ctx, pool, "ticket_statuses")
 
 	// batch insert
 	batch := &pgx.Batch{}

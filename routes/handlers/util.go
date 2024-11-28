@@ -43,7 +43,7 @@ func updateTicketsStatus(
 		UPDATE Tickets
 		SET status_id = (
 			SELECT id
-			FROM ticketstatuses
+			FROM ticket_statuses
 			WHERE name = $1
 			LIMIT 1
 		)
@@ -67,7 +67,7 @@ func updateReservationStatus(
 		UPDATE reservations
 		SET status_id = (
 			SELECT id
-			FROM reservationstatuses
+			FROM reservation_statuses
 			WHERE name = $1
 			LIMIT 1
 		)
@@ -109,8 +109,8 @@ func fetchTicketDetails(
 			tt.discount,
 			tt.id,
 			ts.id
-		FROM tickettypes tt
-		JOIN ticketstatuses ts ON ts.name = $2
+		FROM ticket_types tt
+		JOIN ticket_statuses ts ON ts.name = $2
 		WHERE tt.name = $1
 	`
 	var discount float64
@@ -141,7 +141,7 @@ func fetchReservationDetails(
 			e.available_tickets,
 			rs.id
 		FROM events e
-		JOIN reservationstatuses rs ON rs.name = $2
+		JOIN reservation_statuses rs ON rs.name = $2
 		WHERE e.id = $1
 	`
 	var basePrice float64
@@ -174,8 +174,8 @@ func fetchTicketsForReservation(
 	query := `
 		SELECT t.id, t.price, ts.name AS status, tt.name AS type
 		FROM Tickets t
-		JOIN TicketStatuses ts ON t.status_id = ts.id
-		JOIN TicketTypes tt ON t.type_id = tt.id
+		JOIN ticket_statuses ts ON t.status_id = ts.id
+		JOIN ticket_types tt ON t.type_id = tt.id
 		WHERE t.reservation_id = $1
 	`
 

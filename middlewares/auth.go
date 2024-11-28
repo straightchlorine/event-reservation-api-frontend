@@ -14,27 +14,17 @@ type ContextKey string
 // JWT claims stored in the context
 const UserClaimsKey ContextKey = "userClaims"
 
-/*
-Validate JWT tokens using HMAC and add claims to the request context.
-
-Arguments:
-
-	jwtSecret: Secret key used to sign the JWT token.
-
-Returns:
-
-	http.Handler: Middleware function, ensuring authorization during routing.
-*/
+// Validate JWT tokens using HMAC and add claims to the request context.
 func RequireAuth(jwtSecret string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			tokenString, err := extractToken(r)
+			tokenString, err := ExtractToken(r)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusUnauthorized)
 				return
 			}
 
-			claims, err := validateJWT(tokenString, jwtSecret)
+			claims, err := ValidateJWT(tokenString, jwtSecret)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusUnauthorized)
 				return
@@ -47,18 +37,8 @@ func RequireAuth(jwtSecret string) func(next http.Handler) http.Handler {
 	}
 }
 
-/*
-Extract the JWT token from the Authorization header.
-
-Arguments:
-
-	r: HTTP request object.
-
-Returns:
-
-	token and error (nil if successful).
-*/
-func extractToken(r *http.Request) (string, error) {
+// Extract the JWT token from the Authorization header.
+func ExtractToken(r *http.Request) (string, error) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		return "", fmt.Errorf("Missing Authorization header")
@@ -73,21 +53,10 @@ func extractToken(r *http.Request) (string, error) {
 	return tokenString, nil
 }
 
-/*
-Parse and validate the JWT token using the provided secret.
-
-Arguments:
-
-	tokenString: JWT token string.
-	jwtSecret: Secret key used to sign the JWT token.
-
-Returns:
-
-	jwt.MapClaims and error (nil if successful).
-*/
-func validateJWT(tokenString, jwtSecret string) (jwt.MapClaims, error) {
+// Parse and validate the JWT token using the provided secret.
+func ValidateJWT(tokenString, jwtSecret string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Ensure the signing method is HMAC
+		// validate the signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
@@ -97,7 +66,7 @@ func validateJWT(tokenString, jwtSecret string) (jwt.MapClaims, error) {
 		return nil, fmt.Errorf("invalid or expired token: %v", err)
 	}
 
-	// Extract and verify claims
+	// extract the claims
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
 		return nil, fmt.Errorf("invalid token claims")
@@ -106,17 +75,7 @@ func validateJWT(tokenString, jwtSecret string) (jwt.MapClaims, error) {
 	return claims, nil
 }
 
-/*
-Retrieve JWT claims from the request context.
-
-Arguments:
-
-	ctx: Request context.
-
-Returns:
-
-	jwt.MapClaims and error (nil if successful).
-*/
+// Retrieve JWT claims from the request context.
 func GetClaimsFromContext(ctx context.Context) (jwt.MapClaims, error) {
 	claims, ok := ctx.Value(UserClaimsKey).(jwt.MapClaims)
 	if !ok {
