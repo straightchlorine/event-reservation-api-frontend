@@ -37,7 +37,14 @@ func populateDatabase(populateFlag *bool, pool *pgxpool.Pool) {
 	}
 }
 
-// Populate the database and expose the API routes.
+// @title           Ticket Reservation API
+// @version         1.0
+// @description     Simple API for managing ticket reservations.
+
+// @host      localhost:8080
+// @BasePath  /api/
+
+// @securityDefinitions.basic  JWT secret key
 func main() {
 	// Initialize the JWT secret.
 	jwtSecret := middlewares.InitJWTSecret()

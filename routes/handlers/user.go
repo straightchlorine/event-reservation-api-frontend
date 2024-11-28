@@ -14,11 +14,13 @@ import (
 	"event-reservation-api/models"
 )
 
-/*
-Retrieve all users.
-
-Available only for admin users.
-*/
+// GetUserHandler godoc
+// @Summary      List all users
+// @Description  accessible only with admin privileges
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Router       /users [get]
 func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// get the claims from the context

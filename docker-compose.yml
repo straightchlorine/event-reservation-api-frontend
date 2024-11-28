@@ -57,6 +57,15 @@ services:
         restart: true
     ports:
       - "${API_PORT}:${API_PORT}"
+  swagger:
+    image: swaggerapi/swagger-ui
+    container_name: swagger-ui
+    environment:
+      SWAGGER_JSON: /usr/share/nginx/html/docs/swagger.json
+    volumes:
+      - ./docs/:/usr/share/nginx/html/docs
+    ports:
+      - "80:8080"
 
 # volumes:
 #   db-data:
