@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// context key type
 type ContextKey string
 
 // JWT claims stored in the context
@@ -67,7 +68,7 @@ func RequireAuth(jwtSecret string) func(next http.Handler) http.Handler {
 			}
 
 			// extract and validate the claims
-			claims, err := ValidateJWT(tokenString, jwtSecret)
+			claims, err := GetValidatedClaims(tokenString, jwtSecret)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusUnauthorized)
 				return
@@ -82,6 +83,7 @@ func RequireAuth(jwtSecret string) func(next http.Handler) http.Handler {
 
 // Extract the JWT token from the Authorization header.
 func ExtractToken(r *http.Request) (string, error) {
+	// extract the authentication header
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		return "", fmt.Errorf("Missing Authorization header")
@@ -97,19 +99,14 @@ func ExtractToken(r *http.Request) (string, error) {
 }
 
 // Parse and validate the JWT token using the provided secret.
-func ValidateJWT(tokenString, jwtSecret string) (jwt.MapClaims, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// validate the signing method
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(jwtSecret), nil
-	})
+func GetValidatedClaims(tokenString, jwtSecret string) (jwt.MapClaims, error) {
+	token, err := ValidateJWT(tokenString, jwtSecret)
+
 	if err != nil {
 		return nil, fmt.Errorf("invalid or expired token: %v", err)
 	}
 
-	// extract the claims
+	// extract the claims from the token
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
 		return nil, fmt.Errorf("invalid token claims")
