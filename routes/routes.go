@@ -15,9 +15,11 @@ func SetupRoutes(pool *pgxpool.Pool, jwtSecret string) *mux.Router {
 
 	// Authentication middleware
 	authMiddleware := middlewares.RequireAuth(jwtSecret)
+	tokenValidationMiddleware := middlewares.TokenValidation(pool, jwtSecret)
 
 	// Public routes (no auth required)
 	r.HandleFunc("/login", handlers.LoginHandler(pool, jwtSecret)).Methods(http.MethodPost)
+	r.HandleFunc("/logout", handlers.LogoutHandler(pool, jwtSecret)).Methods(http.MethodPost)
 
 	r.HandleFunc("/api/events", handlers.GetEventsHandler(pool)).Methods(http.MethodGet)
 	r.HandleFunc("/api/events/{id}", handlers.GetEventByIDHandler(pool)).Methods(http.MethodGet)
@@ -27,12 +29,14 @@ func SetupRoutes(pool *pgxpool.Pool, jwtSecret string) *mux.Router {
 
 	locRouter := r.PathPrefix("/api/locations").Subrouter()
 	locRouter.Use(authMiddleware)
+	locRouter.Use(tokenValidationMiddleware)
 	locRouter.HandleFunc("", handlers.CreateLocationHandler(pool)).Methods(http.MethodPut)
 	locRouter.HandleFunc("/{id}", handlers.UpdateLocationHandler(pool)).Methods(http.MethodPut)
 	locRouter.HandleFunc("/{id}", handlers.DeleteLocationHandler(pool)).Methods(http.MethodDelete)
 
 	resRouter := r.PathPrefix("/api/reservations").Subrouter()
 	resRouter.Use(authMiddleware)
+	resRouter.Use(tokenValidationMiddleware)
 	resRouter.HandleFunc("", handlers.CreateReservationHandler(pool)).Methods(http.MethodPut)
 	resRouter.HandleFunc("", handlers.GetReservationHandler(pool)).Methods(http.MethodGet)
 	resRouter.HandleFunc("/{id}", handlers.GetReservationByIDHandler(pool)).Methods(http.MethodGet)
@@ -44,13 +48,14 @@ func SetupRoutes(pool *pgxpool.Pool, jwtSecret string) *mux.Router {
 
 	eventRouter := r.PathPrefix("/api/events").Subrouter()
 	eventRouter.Use(authMiddleware)
+	eventRouter.Use(tokenValidationMiddleware)
 	eventRouter.HandleFunc("", handlers.CreateEventHandler(pool)).Methods(http.MethodPut)
 	eventRouter.HandleFunc("/{id}", handlers.UpdateEventHandler(pool)).Methods(http.MethodPut)
 	eventRouter.HandleFunc("/{id}", handlers.DeleteEventHandler(pool)).Methods(http.MethodDelete)
 
 	userRouter := r.PathPrefix("/api/users").Subrouter()
-
 	userRouter.Use(authMiddleware)
+	userRouter.Use(tokenValidationMiddleware)
 	userRouter.HandleFunc("", handlers.GetUserHandler(pool)).Methods(http.MethodGet)
 	userRouter.HandleFunc("/{id}", handlers.GetUserByIDHandler(pool)).Methods(http.MethodGet)
 
