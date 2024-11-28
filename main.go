@@ -10,19 +10,12 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"event-reservation-api/auth"
 	"event-reservation-api/db"
+	"event-reservation-api/middlewares"
 	"event-reservation-api/routes"
 )
 
-/*
-Populate the database with initial data if the populate flag is set.
-
-Arguments:
-
-	populateFlag: A boolean flag indicating whether to populate the database.
-	pool: A connection pool to the database.
-*/
+// Populate the database with initial data if the populate flag is set.
 func populateDatabase(populateFlag *bool, pool *pgxpool.Pool) {
 	if *populateFlag {
 		// if the flag is provided...
@@ -44,11 +37,10 @@ func populateDatabase(populateFlag *bool, pool *pgxpool.Pool) {
 	}
 }
 
-// Main function
-// Handles populating the database and exposing the API routes.
+// Populate the database and expose the API routes.
 func main() {
 	// Initialize the JWT secret.
-	jwtSecret := auth.InitJWTSecret()
+	jwtSecret := middlewares.InitJWTSecret()
 
 	// Parse the command line flags.
 	populateFlag := flag.Bool("populate", false, "Populate the database with initial data.")

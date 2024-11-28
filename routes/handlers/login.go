@@ -4,13 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
-	"strconv"
-	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
+
+	"event-reservation-api/middlewares"
 )
 
 // Expected login payload.
@@ -57,20 +55,7 @@ func LoginHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 		}
 
 		// get the token validity duration from env variable, otherwise 24 hours
-		valid_h, err := strconv.Atoi(os.Getenv("TOKEN_VALID_HOURS"))
-		if err != nil {
-			valid_h = 24
-		}
-
-		// generate a JWT for the authenticated user
-		claims := jwt.MapClaims{
-			"userID": userID,
-			"role":   role,
-			"exp":    time.Now().Add(time.Duration(valid_h) * time.Hour).Unix(),
-		}
-
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-		tokenString, err := token.SignedString([]byte(jwtSecret))
+		tokenString, err := middlewares.GenerateJWT(userID, role, jwtSecret)
 
 		if err != nil {
 			http.Error(w, "Failed to generate token", http.StatusInternalServerError)

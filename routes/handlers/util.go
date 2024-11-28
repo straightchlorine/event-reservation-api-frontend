@@ -383,6 +383,7 @@ func checkDuplicateUsername(
 ) error {
 	var query string
 	var args []interface{}
+
 	if excludeID == nil {
 		query = "SELECT id FROM users WHERE username = $1 LIMIT 1"
 		args = append(args, username)
@@ -390,6 +391,7 @@ func checkDuplicateUsername(
 		query = "SELECT id FROM users WHERE username = $1 AND id != $2 LIMIT 1"
 		args = append(args, username, *excludeID)
 	}
+
 	var existingID string
 	err := pool.QueryRow(ctx, query, args...).Scan(&existingID)
 	if err == nil {

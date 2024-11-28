@@ -218,9 +218,9 @@ func CreateReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		writeJSONResponse(
 			w,
 			http.StatusCreated,
-			map[string]string{
-				"message":        "Created reservation successfully",
-				"reservation_id": reservationId,
+			map[string]interface{}{
+				"message":       "Reservation created successfully",
+				"reservationId": reservationId,
 			},
 		)
 	}

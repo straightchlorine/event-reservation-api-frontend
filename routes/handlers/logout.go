@@ -21,7 +21,7 @@ func LogoutHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 		}
 
 		// extract the claims
-		claims, err := middlewares.ValidateJWT(tokenString, jwtSecret)
+		claims, err := middlewares.GetValidatedClaims(tokenString, jwtSecret)
 		if err != nil {
 			handleError(w, http.StatusUnauthorized, "Failed to validate token", err)
 			return
