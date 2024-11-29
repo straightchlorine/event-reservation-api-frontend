@@ -60,6 +60,7 @@ type LocationResponse struct {
 	Capacity int    `json:"capacity" example:"90000"`
 }
 
+// UserResponse, as it is returned to the user.
 type UserResponse struct {
 	ID        uuid.UUID `json:"id"`
 	Name      string    `json:"name"`
@@ -68,7 +69,7 @@ type UserResponse struct {
 	Email     string    `json:"email"`
 	LastLogin time.Time `json:"last_login,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
-	RoleName  int       `json:"role_id"`
+	RoleName  string    `json:"role_id"`
 	IsActive  bool      `json:"is_active"`
 }
 

@@ -18,8 +18,8 @@ import (
 func confirmReservation(
 	ctx context.Context,
 	tx pgx.Tx,
-	reservationId string) error {
-
+	reservationId string,
+) error {
 	err := updateReservationStatus(ctx, tx, reservationId, "CONFIRMED")
 	if err != nil {
 		return fmt.Errorf("Failed to update reservation status: %w", err)
@@ -37,8 +37,8 @@ func updateTicketsStatus(
 	ctx context.Context,
 	tx pgx.Tx,
 	resId string,
-	status string) error {
-
+	status string,
+) error {
 	query := `
 		UPDATE Tickets
 		SET status_id = (
@@ -61,8 +61,8 @@ func updateReservationStatus(
 	ctx context.Context,
 	tx pgx.Tx,
 	resId string,
-	status string) error {
-
+	status string,
+) error {
 	query := `
 		UPDATE reservations
 		SET status_id = (
@@ -84,8 +84,8 @@ func substractTicketsFromEvent(
 	ctx context.Context,
 	tx pgx.Tx,
 	eventID int,
-	tickets int) error {
-
+	tickets int,
+) error {
 	query := `
 		UPDATE events
 		SET available_tickets = $2
@@ -103,7 +103,8 @@ func fetchTicketDetails(
 	ctx context.Context,
 	tx pgx.Tx,
 	ticketStatus string,
-	ticketType string) (float64, int, int, error) {
+	ticketType string,
+) (float64, int, int, error) {
 	query := `
 		SELECT
 			tt.discount,
@@ -134,7 +135,8 @@ func fetchReservationDetails(
 	r *http.Request,
 	tx pgx.Tx,
 	status string,
-	eventID int) (float64, int, int, error) {
+	eventID int,
+) (float64, int, int, error) {
 	query := `
 		SELECT
 			e.price,
@@ -245,7 +247,6 @@ func insertLocation(
 		ctx, query,
 		address, stadium, capacity, country,
 	).Scan(&locationID)
-
 	if err != nil {
 		return -1, fmt.Errorf("failed to insert a new location: %w", err)
 	}
@@ -260,7 +261,6 @@ func getLocationID(
 	capacity *int,
 	country *string,
 ) (int, error) {
-
 	// validate the location data
 	if err := validateAddressAndStadium(address, stadium); err != nil {
 		return -1, err
@@ -279,7 +279,6 @@ func getLocationID(
 	` + whereClause
 	var locationID int
 	err := tx.QueryRow(r.Context(), query, args...).Scan(&locationID)
-
 	// if the location does not exist, insert it, otherwise return the ID
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -393,24 +392,25 @@ func FetchRole(ctx context.Context, pool *pgxpool.Pool, roleID int) (string, err
 	return strings.ToUpper(roleName), nil
 }
 
-// Fetch the role ID associated with a given role name.
-// If failed returns Internal Server Error code along with err.
+// Fetch role ID associated with a given role name.
+// Returns 500 if the role ID cannot be fetched.
 func fetchRoleId(ctx context.Context, pool *pgxpool.Pool, roleName string) (int, error) {
 	var roleId int
 	query := "SELECT id FROM roles WHERE name = $1"
 	err := pool.QueryRow(ctx, query, strings.ToUpper(roleName)).Scan(&roleId)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, fmt.Errorf("Failed to fetch role ID.")
 	}
 	return roleId, nil
 }
 
 // Verify if user can be created from the fields passed in the payload.
+// Mandatory fields are username (unique), password as well as name of the role
+// additionally admin role is required if another admin user is created.
 func validateCreateUserPayload(
 	isAdmin bool,
 	user models.CreateUserRequest,
 ) (int, error) {
-
 	// check if user has permissions to create an admin user
 	if user.RoleName == "ADMIN" && !isAdmin {
 		return http.StatusForbidden, fmt.Errorf("Insufficient permissions to create an admin user.")
@@ -424,50 +424,49 @@ func validateCreateUserPayload(
 	return 200, nil
 }
 
-// Return the role name if the username is not a duplicate.
-// If error is caught, instead of roleId, http status is returned.
-func getRoleIdIfNotDuplicate(
+// Verify if user can be created with the username passed in the payload.
+// Returns status 200 if the username is not taken, 409 if it is. In case of other errors, 500.
+func isDuplicate(
 	ctx context.Context,
 	pool *pgxpool.Pool,
 	username string,
 ) (int, error) {
-	var args []interface{}
-
 	query := `
 		SELECT
-			u.id
+			u.id,
 			r.id
 		FROM users u
 		JOIN roles r ON u.role_id = r.id
 		WHERE username = $1
 	`
-	args = append(args, username)
-
 	var existingID string
 	var roleId int
-	err := pool.QueryRow(ctx, query, args...).Scan(&existingID, &roleId)
+	err := pool.QueryRow(ctx, query, username).Scan(&existingID, &roleId)
 
 	if err == nil {
 		return http.StatusConflict, fmt.Errorf("Username '%s' is already taken.", username)
 	}
 	if err == pgx.ErrNoRows {
-		return roleId, nil
+		return http.StatusOK, nil
 	}
 	return http.StatusInternalServerError, fmt.Errorf("Failed to check for duplicate username.")
 }
 
-func isDuplicate(
+// Verify if the user can be updated with the username passed in the payload.
+// Returns status 200 if the username is not taken, 409 if it is. In case of other errors, 500.
+func isDuplicateExcept(
 	ctx context.Context,
 	pool *pgxpool.Pool,
 	username string,
-	excludeID string) (int, error) {
+	excludeID string,
+) (int, error) {
 	query := `
 		SELECT
-			u.id
+			u.id,
 			r.id
 		FROM users u
 		JOIN roles r ON u.role_id = r.id
-		WHERE username = $1 AND id != $2
+		WHERE u.username = $1 AND u.id != $2
 	`
 	var existingID string
 	err := pool.QueryRow(ctx, query, username, excludeID).Scan(&existingID)
@@ -476,7 +475,7 @@ func isDuplicate(
 		return http.StatusConflict, fmt.Errorf("Username '%s' is already taken.", username)
 	}
 	if err == pgx.ErrNoRows {
-		return -1, nil
+		return http.StatusOK, nil
 	}
 	return http.StatusInternalServerError, fmt.Errorf("Failed to check for duplicate username.")
 }

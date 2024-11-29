@@ -14,7 +14,7 @@ import (
 	"event-reservation-api/models"
 )
 
-// GetUserHandler returns a handler function that lists all users.
+// GetUserHandler lists all users.
 //
 //	@Summary		List all users (admin only)
 //	@Description	Retrieve a list of all users, including their details and roles.
@@ -35,44 +35,45 @@ func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		// fetch users and role names
-		query := `SELECT
-				u.id, u.name, u.surname, u.username, u.email,
+		query := `
+			SELECT u.id, u.name, u.surname, u.username, u.email,
 				u.last_login, u.created_at, u.is_active,
-				r.name
+				r.name as role_name
 			FROM users u
 			JOIN roles r ON u.role_id = r.id
 			ORDER BY u.id ASC
 		`
 		rows, err := pool.Query(r.Context(), query)
 		if err != nil {
+			if err == pgx.ErrNoRows {
+				writeErrorResponse(w, http.StatusNotFound, "No users in the database.")
+				return
+			}
 			writeErrorResponse(w, http.StatusInternalServerError, "Failed to fetch users.")
 			return
 		}
 		defer rows.Close()
 
-		// parse the rows into JSON response
 		users := []models.UserResponse{}
 		for rows.Next() {
 			var user models.UserResponse
+
 			if err := rows.Scan(
 				&user.ID, &user.Name, &user.Surname, &user.Username, &user.Email,
-				&user.LastLogin, &user.CreatedAt, &user.IsActive, &user.RoleName,
+				&user.LastLogin, &user.CreatedAt,
+				&user.IsActive, &user.RoleName,
 			); err != nil {
-				if err == pgx.ErrNoRows {
-					writeErrorResponse(w, http.StatusNotFound, "No users in the database.")
-					return
-				}
 				writeErrorResponse(w, http.StatusInternalServerError, "Failed to parse user data.")
 				return
 			}
-			users = append(users, user)
 
+			users = append(users, user)
 		}
 		writeJSONResponse(w, http.StatusOK, users)
 	}
 }
 
-// GetUserByIDHandler returns a handler function that returns a single user by ID.
+// GetUserByIDHandler returns a single user by ID.
 //
 //	@Summary		Get a user by ID (admin only)
 //	@Description	Retrieve a user, including its details and roles.
@@ -92,15 +93,13 @@ func GetUserByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// parse id from URL
-		vars := mux.Vars(r)
-		userId, ok := vars["id"]
-		if !ok {
+		userId, err := parseUserIdFromURL(r)
+		if err != nil {
 			writeErrorResponse(w, http.StatusBadRequest, "User ID not provided in the URL.")
 			return
 		}
 
-		// find user with the given ID
+		// find user and its details with the given ID
 		query := `
 			SELECT
 				u.id, u.name, u.surname, u.username, u.email,
@@ -113,21 +112,16 @@ func GetUserByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		user := models.UserResponse{}
 		row := pool.QueryRow(r.Context(), query, userId)
 		if err := row.Scan(
-			&user.ID,
-			&user.Name,
-			&user.Surname,
-			&user.Username,
-			&user.Email,
-			&user.LastLogin,
-			&user.CreatedAt,
-			&user.IsActive,
-			&user.RoleName,
+			&user.ID, &user.Name, &user.Surname, &user.Username, &user.Email,
+			&user.LastLogin, &user.CreatedAt,
+			&user.IsActive, &user.RoleName,
 		); err != nil {
 			if err == pgx.ErrNoRows {
 				writeErrorResponse(w, http.StatusNotFound, "User not found.")
 				return
 			}
 			writeErrorResponse(w, http.StatusInternalServerError, "Failed to parse user data.")
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -136,7 +130,7 @@ func GetUserByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-// CreateUserHandler creates a single user in the database;
+// CreateUserHandler creates a single user in the database.
 //
 //	@Summary		Create a new user.
 //	@Description	Retrieve a user, including its details and roles.
@@ -151,7 +145,6 @@ func GetUserByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Router			/users [put]
 func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// check if the user is an admin
 		isAdmin := isAdmin(r)
 
 		// parse the json request
@@ -161,15 +154,16 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// check if permissions are sufficient and mandatory fields present
 		status, err := validateCreateUserPayload(isAdmin, user)
 		if status != 200 && err != nil {
 			writeErrorResponse(w, status, err.Error())
 		}
 
-		// in case user already exists
-		roleId, err := getRoleIdIfNotDuplicate(r.Context(), pool, user.Username)
+		// check if the username is unique
+		status, err = isDuplicate(r.Context(), pool, user.Username)
 		if err != nil {
-			writeErrorResponse(w, roleId, err.Error())
+			writeErrorResponse(w, status, err.Error())
 			return
 		}
 
@@ -180,17 +174,20 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// query template for inserting a user
+		// fetch the role id, based on its name
+		roleId, err := fetchRoleId(r.Context(), pool, user.RoleName)
+		if err != nil {
+			writeErrorResponse(w, roleId, err.Error())
+		}
+
+		// insert a new user
 		var userId string
 		query := `
-			INSERT INTO Users
-				(name, surname, username, email, last_login, created_at, is_active,
-				password_hash, role_id)
-			VALUES ($1, $2, $3, $4, NOW(), NOW(), $5, $6, $7)
+			INSERT INTO users
+				(name, surname, username, email, is_active, password_hash, role_id, last_login)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
 			RETURNING id
 		`
-
-		// execute the query
 		if err := pool.QueryRow(
 			r.Context(), query,
 			user.Name,
@@ -198,7 +195,8 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			user.Username,
 			user.Email,
 			user.IsActive,
-			passwordHash, roleId,
+			passwordHash,
+			roleId,
 		).Scan(&userId); err != nil {
 			writeErrorResponse(w, http.StatusInternalServerError, "Failed to create the user.")
 			return
@@ -207,7 +205,10 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		writeJSONResponse(
 			w,
 			http.StatusCreated,
-			models.SuccessResponseCreateUUID{Message: "User created successfully", UUID: userId},
+			models.SuccessResponseCreateUUID{
+				Message: "User created successfully",
+				UUID:    userId,
+			},
 		)
 	}
 }
@@ -218,7 +219,7 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Description	Update user details (only owner/admin).
 //	@Tags			users
 //	@Param			id	path		string					true	"User ID"
-//	@Success		200	{object}	models.SuccessResponse	"User details"
+//	@Success		200	{object}	models.SuccessResponse	"User updated successfully"
 //	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
 //	@Failure		404	{object}	models.ErrorResponse	"Not Found"
 //	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
@@ -226,15 +227,12 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Router			/users/{id} [put]
 func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// parse the user id from the url
-		vars := mux.Vars(r)
-		userId, ok := vars["id"]
-		if !ok {
-			writeErrorResponse(w, http.StatusBadRequest, "User ID not provided in the query.")
+		userId, err := parseUserIdFromURL(r)
+		if err != nil {
+			writeErrorResponse(w, http.StatusBadRequest, "User ID not provided in the URL.")
 			return
 		}
 
-		// the only ones to update user are admins and owners themselves
 		if !isAdmin(r) && !isOwner(r, userId) {
 			writeErrorResponse(
 				w,
@@ -251,13 +249,18 @@ func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// build update query
+		// query starting point
 		query := `UPDATE users SET `
+
+		// arguments for filling the query
 		args := []interface{}{}
+
+		// index of each argument
 		idx := 1
 
+		// based on the present parameters, build update query
 		if req.Username != nil {
-			if status, err := isDuplicate(r.Context(), pool, *req.Username, userId); err != nil {
+			if status, err := isDuplicateExcept(r.Context(), pool, *req.Username, userId); err != nil {
 				writeErrorResponse(w, status, err.Error())
 				return
 			}
@@ -280,7 +283,6 @@ func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				[]byte(*req.Password),
 				bcrypt.DefaultCost,
 			)
-
 			if err != nil {
 				writeErrorResponse(w, http.StatusInternalServerError, "Failed to hash password.")
 				return
@@ -319,18 +321,20 @@ func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		query = strings.TrimSuffix(query, ", ") + fmt.Sprintf(" WHERE id = $%d", idx)
 		args = append(args, userId)
 
-		// execute the query
-		_, err := pool.Exec(r.Context(), query, args...)
-		if err != nil {
+		// update the user
+		if _, err := pool.Exec(
+			r.Context(),
+			query,
+			args...,
+		); err != nil {
 			writeErrorResponse(w, http.StatusInternalServerError, "Failed to update user.")
 			return
 		}
 
-		// write response
 		writeJSONResponse(
 			w,
 			http.StatusOK,
-			models.SuccessResponse{Message: "User updated successfully"},
+			models.SuccessResponse{Message: "User updated successfully."},
 		)
 	}
 }
@@ -349,10 +353,8 @@ func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Router			/users/{id} [delete]
 func DeleteUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// parse the user id from the url
-		vars := mux.Vars(r)
-		userId, ok := vars["id"]
-		if !ok {
+		userId, err := parseUserIdFromURL(r)
+		if err != nil {
 			writeErrorResponse(w, http.StatusBadRequest, "User ID not provided in the URL.")
 			return
 		}
@@ -367,10 +369,13 @@ func DeleteUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// execute the query
+		// delete the user
 		query := `DELETE FROM users WHERE id = $1`
-		_, err := pool.Exec(r.Context(), query, userId)
-		if err != nil {
+		if _, err = pool.Exec(
+			r.Context(),
+			query,
+			userId,
+		); err != nil {
 			writeErrorResponse(w, http.StatusInternalServerError, "Failed to delete user.")
 			return
 		}
@@ -381,4 +386,14 @@ func DeleteUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			models.SuccessResponse{Message: "User deleted successfully"},
 		)
 	}
+}
+
+// Parse user ID from the URL.
+func parseUserIdFromURL(r *http.Request) (string, error) {
+	vars := mux.Vars(r)
+	userId, ok := vars["id"]
+	if !ok {
+		return "", fmt.Errorf("User ID not provided in the URL.")
+	}
+	return userId, nil
 }
