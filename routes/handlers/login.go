@@ -12,20 +12,20 @@ import (
 	"event-reservation-api/models"
 )
 
-// Login handler godoc
+// Login handler facilitates the login process.
 //
-//	@Summary			Login to the API.
+//	@Summary		Login to the API.
 //	@Description	Pass username and password to authenticate and get a JWT token.
-//	@ID						api.login
-//	@Tags					auth
-//	@Accept				json
-//	@Produce			json
-//	@Param				body		body		models.LoginRequest		true	"Login credentials"
-//	@Success			200		{object}	models.LoginResponse	"Successfully logged in"
-//	@Failure			400		{object}	models.ErrorResponse	"Bad Request"
-//	@Failure			401		{object}	models.ErrorResponse	"Unauthorized"
-//	@Failure			500		{object}	models.ErrorResponse	"Internal Server Error"
-//	@Router				/login [post]
+//	@ID				api.login
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		models.LoginRequest		true	"Login credentials"
+//	@Success		200		{object}	models.LoginResponse	"Successfully logged in"
+//	@Failure		400		{object}	models.ErrorResponse	"Bad Request"
+//	@Failure		401		{object}	models.ErrorResponse	"Unauthorized"
+//	@Failure		500		{object}	models.ErrorResponse	"Internal Server Error"
+//	@Router			/login [post]
 func LoginHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// parse login request
