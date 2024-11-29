@@ -14,20 +14,20 @@ import (
 
 // Login handler godoc
 //
-//	@Summary			Login to the API
+//	@Summary			Login to the API.
 //	@Description	Pass username and password to authenticate and get a JWT token.
-//	@ID				  	api.login
+//	@ID						api.login
+//	@Tags					auth
 //	@Accept				json
 //	@Produce			json
-//	@Param				body	body		models.LoginRequest	true	"Login credentials"
-//	@Success			200		{object}	models.LoginResponse
-//	@Failure			400		{object}	handlers.ErrorResponse	"Bad Request"
-//	@Failure			401		{object}	handlers.ErrorResponse	"Unauthorized"
-//	@Failure			500		{object}	handlers.ErrorResponse	"Internal Server Error"
+//	@Param				body		body		models.LoginRequest		true	"Login credentials"
+//	@Success			200		{object}	models.LoginResponse	"Successfully logged in"
+//	@Failure			400		{object}	models.ErrorResponse	"Bad Request"
+//	@Failure			401		{object}	models.ErrorResponse	"Unauthorized"
+//	@Failure			500		{object}	models.ErrorResponse	"Internal Server Error"
 //	@Router				/login [post]
 func LoginHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		// parse login request
 		var loginReq models.LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&loginReq); err != nil {

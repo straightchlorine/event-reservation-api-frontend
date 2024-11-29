@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/gorilla/handlers"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"event-reservation-api/db"
@@ -37,14 +38,14 @@ func populateDatabase(populateFlag *bool, pool *pgxpool.Pool) {
 	}
 }
 
-// @title           Ticket Reservation API
-// @version         1.0
-// @description     Simple API for managing ticket reservations.
+//	@title			Ticket Reservation API
+//	@version		1.0
+//	@description	Simple API for managing ticket reservations.
 
-// @host      localhost:8080
-// @BasePath  /api/
+//	@host		localhost:8080
+//	@BasePath	/api/
 
-// @securityDefinitions.basic  JWT secret key
+// @securityDefinitions.basic	JWT secret key
 func main() {
 	// Initialize the JWT secret.
 	jwtSecret := middlewares.InitJWTSecret()
@@ -72,7 +73,13 @@ func main() {
 		port = "8080"
 	}
 
+	cors := handlers.CORS(
+		handlers.AllowedOrigins([]string{"*"}),
+		handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE"}),
+		handlers.AllowedHeaders([]string{"Content-Type", "Authorization"}),
+	)
+
 	// Log the server start.
 	fmt.Printf("Server running on port %s\n", port)
-	log.Fatal(http.ListenAndServe(":"+port, r))
+	log.Fatal(http.ListenAndServe(":"+port, cors(r)))
 }

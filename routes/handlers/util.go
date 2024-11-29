@@ -199,79 +199,95 @@ func fetchTicketsForReservation(
 	return tickets, nil
 }
 
-// Utility to check if a location exists within the database.
-func getLocationID(
-	r *http.Request,
-	w http.ResponseWriter,
-	tx pgx.Tx,
-	locationAddress *string,
-	locationStadium *string,
-	locationCapacity *int,
-	locationCountry *string,
-) (int, error) {
-	// If location is nil, return an error (or handle it as needed)
-	if locationAddress == nil || locationStadium == nil {
-		return -1, fmt.Errorf("Insufficient location data: address and stadium are required")
+// Build a WHERE clause for filtering locations.
+// If both provided: WHERE address = $1 AND stadium = $2; otherwise OR is used.
+func getWhereClause(address *string, stadium *string) (string, []interface{}) {
+	var conditions []string
+	var args []interface{}
+
+	if address != nil && *address != "" {
+		conditions = append(conditions, "address = $"+fmt.Sprint(len(args)+1))
+		args = append(args, *address)
+	}
+	if stadium != nil && *stadium != "" {
+		conditions = append(conditions, "stadium = $"+fmt.Sprint(len(args)+1))
+		args = append(args, *stadium)
 	}
 
+	if len(conditions) == 0 {
+		return "", nil
+	}
+	return "WHERE " + strings.Join(conditions, " AND "), args
+}
+
+func validateAddressAndStadium(address *string, stadium *string) error {
+	if (address == nil || *address == "") && (stadium == nil || *stadium == "") {
+		return fmt.Errorf("insufficient location data: address or stadium must be provided")
+	}
+	return nil
+}
+
+func insertLocation(
+	ctx context.Context,
+	tx pgx.Tx,
+	address *string,
+	stadium *string,
+	capacity *int,
+	country *string,
+) (int, error) {
 	var locationID int
-	var err error
-
-	// query to check if location exists
-	checkIfLocationExists := `
-		SELECT id
-		FROM Locations
-		WHERE address = $1 OR stadium = $2
+	query := `
+		INSERT INTO Locations (address, stadium, capacity, country)
+		VALUES ($1, $2, COALESCE($3, 0), COALESCE($4, ''))
+		RETURNING id
 	`
-
-	// execute the query and scan the result
-	err = tx.QueryRow(
-		r.Context(),
-		checkIfLocationExists,
-		locationAddress,
-		locationStadium,
+	err := tx.QueryRow(
+		ctx, query,
+		address, stadium, capacity, country,
 	).Scan(&locationID)
 
-	// if no rows are returned, the location does not exist
+	if err != nil {
+		return -1, fmt.Errorf("failed to insert a new location: %w", err)
+	}
+	return locationID, nil
+}
+
+// Check if a location exists within the database, if it does not, insert it.
+func getLocationID(
+	r *http.Request, w http.ResponseWriter, tx pgx.Tx,
+	address *string,
+	stadium *string,
+	capacity *int,
+	country *string,
+) (int, error) {
+
+	// validate the location data
+	if err := validateAddressAndStadium(address, stadium); err != nil {
+		return -1, err
+	}
+
+	// build appropriate WHERE clause
+	whereClause, args := getWhereClause(address, stadium)
+	if whereClause == "" {
+		return -1, fmt.Errorf("Failed to build a valid query.")
+	}
+
+	// execute the query
+	query := `
+		SELECT id
+		FROM Locations
+	` + whereClause
+	var locationID int
+	err := tx.QueryRow(r.Context(), query, args...).Scan(&locationID)
+
+	// if the location does not exist, insert it, otherwise return the ID
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			// insert new location
-			locationInsertQuery := `
-				INSERT INTO Locations (address, capacity, country, stadium)
-				VALUES ($1, $2, $3, $4)
-				RETURNING id
-			`
-
-			if locationCapacity == nil {
-				*locationCapacity = 0
-			}
-
-			if locationCountry == nil {
-				*locationCountry = ""
-			}
-
-			err = tx.QueryRow(
-				r.Context(),
-				locationInsertQuery,
-				*locationAddress,
-				*locationCapacity,
-				*locationCountry,
-				*locationStadium,
-			).Scan(&locationID)
-			if err != nil {
-				handleError(
-					w,
-					http.StatusInternalServerError,
-					"Failed to insert new location",
-					err,
-				)
-				return -1, err
-			}
-		} else {
-			handleError(w, http.StatusInternalServerError, "Failed to check existing location", err)
-			return -1, err
+			return insertLocation(r.Context(), tx, address, stadium, capacity, country)
 		}
+		return -1, fmt.Errorf("Failed to check existing location.")
 	}
+
 	return locationID, nil
 }
 
@@ -280,19 +296,13 @@ func dateToRFC3339(w http.ResponseWriter, date string) (string, error) {
 	const customDateFormat = "2006-01-02 15:04"
 	var parsedDate time.Time
 
-	// Try parsing with the custom format
+	// try parsing with the custom format
 	parsedDate, err := time.Parse(customDateFormat, date)
 	if err != nil {
-		// If custom format fails, try RFC3339
+		// try RFC3339
 		parsedDate, err = time.Parse(time.RFC3339, date)
 		if err != nil {
-			handleError(
-				w,
-				http.StatusBadRequest,
-				"Invalid date format; must be YYYY-MM-DD HH:MM or RFC3339",
-				err,
-			)
-			return "", err
+			return "", fmt.Errorf("Failed to parse date; ensure the format is correct")
 		}
 	}
 
@@ -311,12 +321,12 @@ func writeJSONResponse(w http.ResponseWriter, status int, data interface{}) {
 }
 
 // Utility function for error handling.
-func handleError(w http.ResponseWriter, status int, message string, err error) {
-	if err != nil {
-		http.Error(w, fmt.Sprintf("%s: %v", message, err), status)
-	} else {
-		http.Error(w, message, status)
-	}
+func writeErrorResponse(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(models.ErrorResponse{
+		Message: message,
+	})
 }
 
 // Helper function to check admin permissions.
