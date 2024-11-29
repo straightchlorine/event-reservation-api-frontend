@@ -20,7 +20,7 @@ import (
 //	@ID				api.getEvents
 //	@Tags			events
 //	@Produce		json
-//	@Success		200	{object}	models.EventResponse	"List of events"
+//	@Success		200	{array}	models.EventResponse	"List of events"
 //	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
 //	@Failure		404	{object}	models.ErrorResponse	"Not Found"
 //	@Router			/events [get]
@@ -149,12 +149,17 @@ func GetEventByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Param			body	body		models.CreateEventRequest		true	"Payload to create an event"
 //	@Success		200		{object}	models.SuccessResponseCreate	"Event created successfully"
 //	@Failure		400		{object}	models.ErrorResponse			"Bad Request"
+//	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
 //	@Failure		500		{object}	models.ErrorResponse			"Internal Server Error"
 //	@Router			/events [put]
 func CreateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !isAdmin(r) {
-			writeErrorResponse(w, http.StatusForbidden, "Insufficient permissions.")
+			writeErrorResponse(
+				w,
+				http.StatusForbidden,
+				"Insufficient permissions to create an event.",
+			)
 			return
 		}
 
@@ -250,11 +255,21 @@ func CreateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Param			body	body		models.UpdateEventRequest	true	"Payload to update an event"
 //	@Success		200		{object}	models.SuccessResponse		"Event updated successfully"
 //	@Failure		400		{object}	models.ErrorResponse		"Bad Request"
+//	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
 //	@Failure		422		{object}	models.ErrorResponse		"Unprocessable Entity"
 //	@Failure		500		{object}	models.ErrorResponse		"Internal Server Error"
 //	@Router			/events/{id} [put]
 func UpdateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !isAdmin(r) {
+			writeErrorResponse(
+				w,
+				http.StatusForbidden,
+				"Insufficient permissions to update an event.",
+			)
+			return
+		}
+
 		// parse the event ID from the URL
 		vars := mux.Vars(r)
 		eventID, ok := vars["id"]

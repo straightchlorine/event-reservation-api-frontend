@@ -22,6 +22,7 @@ import (
 //	@Success		200	{object}	models.LoginResponse	"Successfully logged out"
 //	@Failure		401	{object}	models.ErrorResponse	"Unauthorized"
 //	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
+//	@Security		BearerAuth
 //	@Router			/logout [post]
 func LogoutHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

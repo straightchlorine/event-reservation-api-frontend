@@ -13,7 +13,17 @@ import (
 	"event-reservation-api/models"
 )
 
-// Fetch all locations from the database.
+// GetLocationsHandler lists all locations from the database
+//
+//	@Summary		Get all locations
+//	@Description	Retrieve a list of all locations.
+//	@ID				api.getLocations
+//	@Tags			locations
+//	@Produce		json
+//	@Success		200	{array}		models.LocationResponse	"List of locations"
+//	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
+//	@Failure		404	{object}	models.ErrorResponse	"Not Found"
+//	@Router			/locations [get]
 func GetLocationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		query := `
@@ -23,16 +33,18 @@ func GetLocationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			ORDER BY id ASC
 		`
 
+		// execute the query
 		rows, err := pool.Query(r.Context(), query)
 		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to fetch locations", err)
+			writeErrorResponse(w, http.StatusInternalServerError, "Failed to fetch locations.")
 			return
 		}
 		defer rows.Close()
 
-		locations := []map[string]interface{}{}
+		// build the list of locations
+		locations := []models.LocationResponse{}
 		for rows.Next() {
-			var location models.Location
+			var location models.LocationResponse
 
 			err := rows.Scan(
 				&location.ID,
@@ -42,130 +54,173 @@ func GetLocationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				&location.Capacity,
 			)
 			if err != nil {
-				handleError(w, http.StatusInternalServerError, "Failed to parse location data", err)
+				if err == pgx.ErrNoRows {
+					writeErrorResponse(
+						w,
+						http.StatusNotFound,
+						"No locations found in the database.",
+					)
+				}
+				writeErrorResponse(
+					w,
+					http.StatusInternalServerError,
+					"Failed to parse location data.",
+				)
 				return
 			}
-
-			locations = append(locations, map[string]interface{}{
-				"id":       location.ID,
-				"stadium":  location.Stadium,
-				"address":  location.Address,
-				"country":  location.Country,
-				"capacity": location.Capacity,
-			})
+			locations = append(locations, location)
 		}
 
 		writeJSONResponse(w, http.StatusOK, locations)
 	}
 }
 
-// Retrieve a single location by ID
+// GetLocationByIDHandler returns a single location by ID.
+//
+//	@Summary		Retrieve a location.
+//	@Description	Retrieve a single location by ID.
+//	@ID				api.getLocation
+//	@Tags			locations
+//	@Produce		json
+//	@Param			id	path		string					true	"Location ID"
+//	@Success		200	{object}		models.LocationResponse	"Location details"
+//	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
+//	@Failure		404	{object}	models.ErrorResponse	"Not Found"
+//	@Router			/locations/{id} [get]
 func GetLocationByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		locationID, ok := vars["id"]
 		if !ok {
-			handleError(w, http.StatusBadRequest, "Location ID not provided", nil)
+			writeErrorResponse(w, http.StatusBadRequest, "Location ID not provided in the URL.")
 			return
 		}
 
-		query := `SELECT
-				id,
-				stadium,
-				address,
-				country,
-				capacity
+		query := `
+			SELECT id, stadium, address, country, capacity
 			FROM Locations
-			WHERE id = $1`
+			WHERE id = $1
+		`
 
-		var location models.Location
+		var location models.LocationResponse
 		row := pool.QueryRow(r.Context(), query, locationID)
 
-		err := row.Scan(
+		if err := row.Scan(
 			&location.ID,
 			&location.Stadium,
 			&location.Address,
 			&location.Country,
 			&location.Capacity,
-		)
-		if err == pgx.ErrNoRows {
-			handleError(w, http.StatusNotFound, "Location not found", nil)
+		); err != nil {
+			if err == pgx.ErrNoRows {
+				writeErrorResponse(w, http.StatusNotFound, "Location not found.")
+				return
+			}
+			writeErrorResponse(w, http.StatusInternalServerError, "Failed to fetch the location.")
 			return
 		}
-		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to fetch location", err)
-			return
-		}
-
-		writeJSONResponse(w, http.StatusOK, map[string]interface{}{
-			"id":       location.ID,
-			"stadium":  location.Stadium,
-			"address":  location.Address,
-			"country":  location.Country,
-			"capacity": location.Capacity,
-		})
+		writeJSONResponse(w, http.StatusOK, location)
 	}
 }
 
-// Create a new location
+// CreateLocationHandler creates a single location in the database.
+//
+//	@Summary		Create a new location.
+//	@Description	Parse the payload and create a new location with provided dataset.
+//	@ID				api.createLocation
+//	@Tags			locations
+//	@Produce		json
+//	@Accept			json
+//	@Param			body	body		models.CreateLocationRequest		true	"Payload to create a location"
+//	@Success		200		{object}	models.SuccessResponseCreate	"Location created successfully"
+//	@Failure		400		{object}	models.ErrorResponse			"Bad Request"
+//	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
+//	@Failure		500		{object}	models.ErrorResponse			"Internal Server Error"
+//	@Router			/locations [put]
 func CreateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !isAdmin(r) {
-			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
+			writeErrorResponse(
+				w,
+				http.StatusForbidden,
+				"Insufficient permissions to create a location.",
+			)
 			return
 		}
 
 		// decode the request body
-		input := models.LocationPayload{}
+		input := models.CreateLocationRequest{}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			handleError(w, http.StatusBadRequest, "Invalid JSON input", err)
+			writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON input.")
 			return
 		}
 
 		// validate fields
 		if input.Stadium == "" || input.Address == "" || input.Capacity <= 0 {
-			handleError(w, http.StatusBadRequest, "Missing or invalid fields", nil)
+			writeErrorResponse(
+				w,
+				http.StatusBadRequest,
+				"Missing or invalid fields in the payload.",
+			)
 			return
 		}
 
 		// set default value for country
 		if input.Country == "" {
-			input.Country = ""
+			input.Country = "N/A"
 		}
 
-		// Insert new location
+		// execute the query
+		var locationID int
 		query := `
 			INSERT INTO Locations (stadium, address, country, capacity)
 			VALUES ($1, $2, $3, $4)
 			RETURNING id`
-
-		var locationID int
-		err := pool.QueryRow(
+		if err := pool.QueryRow(
 			r.Context(),
 			query,
 			input.Stadium,
 			input.Address,
 			input.Country,
 			input.Capacity,
-		).Scan(&locationID)
-		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to create location", err)
+		).Scan(&locationID); err != nil {
+			writeErrorResponse(w, http.StatusInternalServerError, "Failed to create a location.")
 			return
 		}
 
-		writeJSONResponse(w, http.StatusCreated, map[string]interface{}{
-			"message":    "Location created successfully",
-			"locationId": locationID,
-		})
+		writeJSONResponse(
+			w,
+			http.StatusCreated,
+			models.SuccessResponseCreate{Message: "Location created successfully", ID: locationID},
+		)
 	}
 }
 
-// Update an existing location
+// UpdateLocationHandler updates an existing location by ID.
+//
+//	@Summary		Update an existing location
+//	@Description	Update location details based on the provided payload.
+//	@ID				api.updateLocation
+//	@Tags			locations
+//	@Produce		json
+//	@Accept			json
+//	@Param			id		path		string						true	"Location ID"
+//	@Param			body	body		models.UpdateLocationRequest	true	"Payload to update a location"
+//	@Success		200		{object}	models.SuccessResponse		"Event updated successfully"
+//	@Failure		400		{object}	models.ErrorResponse		"Bad Request"
+//	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
+//	@Failure		422		{object}	models.ErrorResponse		"Unprocessable Entity"
+//	@Failure		500		{object}	models.ErrorResponse		"Internal Server Error"
+//	@Router			/locations/{id} [put]
 func UpdateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// check if the user is an admin
 		if !isAdmin(r) {
-			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
+			writeErrorResponse(
+				w,
+				http.StatusForbidden,
+				"Insufficient permissions to update a location.",
+			)
 			return
 		}
 
@@ -173,14 +228,14 @@ func UpdateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		vars := mux.Vars(r)
 		locationID, ok := vars["id"]
 		if !ok {
-			handleError(w, http.StatusBadRequest, "Location ID not provided", nil)
+			writeErrorResponse(w, http.StatusBadRequest, "Location ID not provided.")
 			return
 		}
 
 		// decode the body and parse the request
 		input := models.LocationUpdatePayload{}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			handleError(w, http.StatusBadRequest, "Invalid JSON input", err)
+			writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON input.")
 			return
 		}
 
@@ -210,58 +265,67 @@ func UpdateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			idx++
 		}
 
-		// if no fields to update
 		if len(args) == 0 {
-			handleError(w, http.StatusBadRequest, "No fields to update", nil)
+			writeErrorResponse(w, http.StatusUnprocessableEntity, "Nothing to update.")
 			return
 		}
 
-		// remove trailing comma and add where clause
 		query = strings.TrimSuffix(query, ", ") + fmt.Sprintf(" WHERE id = $%d", idx)
 		args = append(args, locationID)
 
-		// execute the query
 		_, err := pool.Exec(r.Context(), query, args...)
 		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to update location", err)
+			writeErrorResponse(w, http.StatusInternalServerError, "Failed to update the location.")
 			return
 		}
 
-		// send the response
-		writeJSONResponse(w, http.StatusOK, map[string]string{
-			"message": "Location updated successfully",
-		})
+		writeJSONResponse(
+			w,
+			http.StatusOK,
+			models.SuccessResponse{Message: "Location updated successfully"},
+		)
 	}
 }
 
-// Delete a location by ID
+// DeleteEventHandler deletes an existing location by ID.
+//
+//	@Summary		Delete an existing location
+//	@Description	Delete a location by its ID.
+//	@ID				api.deleteLocation
+//	@Tags			locations
+//	@Produce		json
+//	@Param			id	path		string							true	"Location ID"
+//	@Success		200	{object}	models.SuccessResponseCreate	"Event deleted successfully"
+//	@Failure		400	{object}	models.ErrorResponse			"Bad Request"
+//	@Failure		500	{object}	models.ErrorResponse			"Internal Server Error"
+//	@Router			/locations/{id} [delete]
 func DeleteLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Check if the user is an admin
 		if !isAdmin(r) {
-			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
+			writeErrorResponse(w, http.StatusForbidden, "Forbidden: Insufficient permissions")
 			return
 		}
 
-		// Parse the location ID from the URL
+		// parse the id
 		vars := mux.Vars(r)
 		locationID, ok := vars["id"]
 		if !ok {
-			handleError(w, http.StatusBadRequest, "Location ID not provided", nil)
+			writeErrorResponse(w, http.StatusBadRequest, "Location ID not provided.")
 			return
 		}
 
-		// Execute the query
+		// delete the user
 		query := `DELETE FROM Locations WHERE id = $1`
 		_, err := pool.Exec(r.Context(), query, locationID)
 		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to delete location", err)
+			writeErrorResponse(w, http.StatusInternalServerError, "Failed to delete the location.")
 			return
 		}
 
-		// Write response
-		writeJSONResponse(w, http.StatusOK, map[string]string{
-			"message": "Location deleted successfully",
-		})
+		writeJSONResponse(
+			w,
+			http.StatusOK,
+			models.SuccessResponse{Message: "Location deleted successfully"},
+		)
 	}
 }
