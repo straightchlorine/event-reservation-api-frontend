@@ -45,7 +45,9 @@ func populateDatabase(populateFlag *bool, pool *pgxpool.Pool) {
 //	@host		localhost:8080
 //	@BasePath	/api/
 
-// @securityDefinitions.basic	JWT secret key
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
 func main() {
 	// Initialize the JWT secret.
 	jwtSecret := middlewares.InitJWTSecret()

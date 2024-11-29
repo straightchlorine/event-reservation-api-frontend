@@ -53,20 +53,6 @@ type LocationUpdatePayload struct {
 	Capacity *int    `json:"capacity,omitempty"`
 }
 
-// Location, as its returned to user
-type LocationResponse struct {
-	Country string `json:"country"`
-	Address string `json:"address"`
-	Stadium string `json:"stadium"`
-}
-
-// Event, as its returned to user
-type EventResponse struct {
-	Name     string           `json:"name"`
-	Date     time.Time        `json:"date"`
-	Location LocationResponse `json:"location"`
-}
-
 // Reservation represents the structure of a reservation.
 type ReservationResponse struct {
 	ID           string           `json:"id"`

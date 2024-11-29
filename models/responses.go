@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // Standardized response for errors.
 type ErrorResponse struct {
@@ -21,7 +25,7 @@ type SuccessResponseCreate struct {
 // Standardized response for successful involving creating objects.
 type SuccessResponseCreateUUID struct {
 	Message string `json:"message" example:"Error message"`
-	ID      string `json:"id"      example:"123e4567-e89b-12d3-a456-426614174000"`
+	UUID    string `json:"id"      example:"123e4567-e89b-12d3-a456-426614174000"`
 }
 
 // User ID and username.
@@ -54,4 +58,16 @@ type LocationResponse struct {
 	Address  string `json:"address"  example:"Wembley Park, London"`
 	Stadium  string `json:"stadium"  example:"Wembley Stadium"`
 	Capacity int    `json:"capacity" example:"90000"`
+}
+
+type UserResponse struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	Surname   string    `json:"surname"`
+	Username  string    `json:"username"`
+	Email     string    `json:"email"`
+	LastLogin time.Time `json:"last_login,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	RoleName  int       `json:"role_id"`
+	IsActive  bool      `json:"is_active"`
 }

@@ -15,15 +15,15 @@ import (
 
 // GetEventsHandler lists all events in the database.
 //
-//	@Summary				Get all events
-//	@Description		Retrieve a list of all available events with their details and locations.
-//	@ID							api.getEvents
-//	@Tags						events
-//	@Produce				json
-//	@Success				200	{array}		models.EventResponse	"List of events"
-//	@Failure				500	{object}	models.ErrorResponse	"Internal Server Error"
-//	@Failure				404	{object}	models.ErrorResponse	"Not Found"
-//	@Router					/events [get]
+//	@Summary		Get all events
+//	@Description	Retrieve a list of all events with their details and locations.
+//	@ID				api.getEvents
+//	@Tags			events
+//	@Produce		json
+//	@Success		200	{object}	models.EventResponse	"List of events"
+//	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
+//	@Failure		404	{object}	models.ErrorResponse	"Not Found"
+//	@Router			/events [get]
 func GetEventsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		query := `
@@ -79,16 +79,16 @@ func GetEventsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // GetEventByIDHandler returns a single event by ID.
 //
-//	@Summary			Get an event by ID
-//	@Description	Retrieve a list of all available events with their details and locations.
-//	@ID						api.getEventByID
-//	@Tags					events
-//	@Produce			json
-//	@Param				id			path		string								true	"Event ID"
-//	@Success			200		{array}		models.EventResponse	"List of events"
-//	@Failure			500		{object}	models.ErrorResponse	"Internal Server Error"
-//	@Failure			404		{object}	models.ErrorResponse	"Not Found"
-//	@Router				/events/{id} [get]
+//	@Summary		Get an event by ID
+//	@Description	Retrieve an event with its details and location.
+//	@ID				api.getEventByID
+//	@Tags			events
+//	@Produce		json
+//	@Param			id	path		string					true	"Event ID"
+//	@Success		200	{object}	models.EventResponse	"Event details"
+//	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
+//	@Failure		404	{object}	models.ErrorResponse	"Not Found"
+//	@Router			/events/{id} [get]
 func GetEventByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// parse the event id from the url
@@ -140,17 +140,17 @@ func GetEventByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // CreateEventHandler creates a single event in the database.
 //
-//	@Summary			Create a new event.
+//	@Summary		Create a new event.
 //	@Description	Parse the payload and create a new event with provided dataset.
-//	@ID						api.createEvent
-//	@Tags					events
-//	@Produce			json
-//	@Accept				json
-//	@Param				body		body		models.CreateEventRequest			true	"Payload to create an event"
-//	@Success			200		{object}	models.SuccessResponseCreate	"Event created successfully"
-//	@Failure			400		{object}	models.ErrorResponse					"Bad Request"
-//	@Failure			500		{object}	models.ErrorResponse					"Internal Server Error"
-//	@Router				/events [put]
+//	@ID				api.createEvent
+//	@Tags			events
+//	@Produce		json
+//	@Accept			json
+//	@Param			body	body		models.CreateEventRequest		true	"Payload to create an event"
+//	@Success		200		{object}	models.SuccessResponseCreate	"Event created successfully"
+//	@Failure		400		{object}	models.ErrorResponse			"Bad Request"
+//	@Failure		500		{object}	models.ErrorResponse			"Internal Server Error"
+//	@Router			/events [put]
 func CreateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !isAdmin(r) {
@@ -175,7 +175,7 @@ func CreateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		// convert date to rfc3339 or yyyy-mm-dd hh:mm format
-		rfc3339Date, err := dateToRFC3339(w, event.Date)
+		rfc3339Date, err := dateToRFC3339(event.Date)
 		if err != nil && rfc3339Date == "" {
 			writeErrorResponse(
 				w,
@@ -195,7 +195,7 @@ func CreateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		// check if location exists, if not, insert it
 		locationID, err := getLocationID(
-			r, w, tx,
+			r, tx,
 			&event.Location.Address, &event.Location.Stadium, // mandatory
 			&event.Location.Capacity,
 			&event.Location.Country,
@@ -240,19 +240,19 @@ func CreateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // UpdateEventHandler updates an existing event by ID.
 //
-//	@Summary			Update an existing event
+//	@Summary		Update an existing event
 //	@Description	Update event details based on the provided payload.
-//	@ID						api.updateEvent
-//	@Tags					events
-//	@Produce			json
-//	@Accept				json
-//	@Param				id			path		string										true	"Event ID"
-//	@Param				body		body		models.UpdateEventRequest	true	"Payload to update an event"
-//	@Success			200		{object}	models.SuccessResponse		"Event updated successfully"
-//	@Failure			400		{object}	models.ErrorResponse			"Bad Request"
-//	@Failure			422		{object}	models.ErrorResponse			"Unprocessable Entity"
-//	@Failure			500		{object}	models.ErrorResponse			"Internal Server Error"
-//	@Router				/events/{id} [put]
+//	@ID				api.updateEvent
+//	@Tags			events
+//	@Produce		json
+//	@Accept			json
+//	@Param			id		path		string						true	"Event ID"
+//	@Param			body	body		models.UpdateEventRequest	true	"Payload to update an event"
+//	@Success		200		{object}	models.SuccessResponse		"Event updated successfully"
+//	@Failure		400		{object}	models.ErrorResponse		"Bad Request"
+//	@Failure		422		{object}	models.ErrorResponse		"Unprocessable Entity"
+//	@Failure		500		{object}	models.ErrorResponse		"Internal Server Error"
+//	@Router			/events/{id} [put]
 func UpdateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// parse the event ID from the URL
@@ -293,7 +293,7 @@ func UpdateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			argIndex++
 		}
 		if eventPayload.Date != nil {
-			rfc3339Date, err := dateToRFC3339(w, *eventPayload.Date)
+			rfc3339Date, err := dateToRFC3339(*eventPayload.Date)
 			if err != nil && rfc3339Date == "" {
 				writeErrorResponse(
 					w,
@@ -314,7 +314,7 @@ func UpdateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if eventPayload.Location != nil {
 			locationID, err := getLocationID(
-				r, w, tx,
+				r, tx,
 				eventPayload.Location.Address,
 				eventPayload.Location.Stadium,
 				eventPayload.Location.Capacity,
@@ -363,16 +363,16 @@ func UpdateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // DeleteEventHandler deletes an existing event by ID.
 //
-//	@Summary			Delete an existing event
+//	@Summary		Delete an existing event
 //	@Description	Delete event by its ID.
-//	@ID						api.deleteEvent
-//	@Tags					events
-//	@Produce			json
-//	@Param				id		path			string												true	"Event ID"
-//	@Success			200		{object}	models.SuccessResponseCreate	"Event deleted successfully"
-//	@Failure			400		{object}	models.ErrorResponse					"Bad Request"
-//	@Failure			500		{object}	models.ErrorResponse					"Internal Server Error"
-//	@Router				/events/{id} [delete]
+//	@ID				api.deleteEvent
+//	@Tags			events
+//	@Produce		json
+//	@Param			id	path		string							true	"Event ID"
+//	@Success		200	{object}	models.SuccessResponseCreate	"Event deleted successfully"
+//	@Failure		400	{object}	models.ErrorResponse			"Bad Request"
+//	@Failure		500	{object}	models.ErrorResponse			"Internal Server Error"
+//	@Router			/events/{id} [delete]
 func DeleteEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)

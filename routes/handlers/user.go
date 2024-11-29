@@ -14,119 +14,105 @@ import (
 	"event-reservation-api/models"
 )
 
-// GetUserHandler godoc
-// @Summary      List all users
-// @Description  accessible only with admin privileges
-// @Tags         users
-// @Accept       json
-// @Produce      json
-// @Router       /users [get]
+// GetUserHandler returns a handler function that lists all users.
+//
+//	@Summary		List all users (admin only)
+//	@Description	Retrieve a list of all users, including their details and roles.
+//	@Tags			users
+//	@Produce		json
+//	@Success		200	{array}		models.UserResponse		"List of users"
+//	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
+//	@Failure		404	{object}	models.ErrorResponse	"Not Found"
+//	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
+//	@Security		BearerAuth
+//	@Router			/users [get]
 func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// get the claims from the context
+		// in order to see users, one must be an admin
 		if !isAdmin(r) {
-			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
+			writeErrorResponse(w, http.StatusForbidden, "Insufficient permissions.")
 			return
 		}
 
-		// fetch users, along with their roles from the database
+		// fetch users and role names
 		query := `SELECT
-				u.id,
-				u.name,
-				u.surname,
-				u.username,
-				u.email,
-				u.last_login,
-				u.created_at,
-				r.name AS role_name
+				u.id, u.name, u.surname, u.username, u.email,
+				u.last_login, u.created_at, u.is_active,
+				r.name
 			FROM users u
 			JOIN roles r ON u.role_id = r.id
-			ORDER BY u.id ASC`
-
+			ORDER BY u.id ASC
+		`
 		rows, err := pool.Query(r.Context(), query)
 		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to fetch users", err)
+			writeErrorResponse(w, http.StatusInternalServerError, "Failed to fetch users.")
 			return
 		}
 		defer rows.Close()
 
 		// parse the rows into JSON response
-		users := []map[string]interface{}{}
+		users := []models.UserResponse{}
 		for rows.Next() {
-			var user models.User
-			var roleName string
-			err := rows.Scan(
-				&user.ID,
-				&user.Name,
-				&user.Surname,
-				&user.Username,
-				&user.Email,
-				&user.LastLogin,
-				&user.CreatedAt,
-				&roleName,
-			)
-			if err != nil {
-				handleError(w, http.StatusInternalServerError, "Failed to parse user data", err)
+			var user models.UserResponse
+			if err := rows.Scan(
+				&user.ID, &user.Name, &user.Surname, &user.Username, &user.Email,
+				&user.LastLogin, &user.CreatedAt, &user.IsActive, &user.RoleName,
+			); err != nil {
+				if err == pgx.ErrNoRows {
+					writeErrorResponse(w, http.StatusNotFound, "No users in the database.")
+					return
+				}
+				writeErrorResponse(w, http.StatusInternalServerError, "Failed to parse user data.")
 				return
 			}
-			users = append(users, map[string]interface{}{
-				"id":         user.ID,
-				"name":       user.Name,
-				"surname":    user.Surname,
-				"username":   user.Username,
-				"email":      user.Email,
-				"last_login": user.LastLogin,
-				"created_at": user.CreatedAt,
-				"role_name":  roleName,
-			})
-		}
+			users = append(users, user)
 
-		// set the headers and encode the reponse
+		}
 		writeJSONResponse(w, http.StatusOK, users)
 	}
 }
 
-/*
-Retrieve a user by ID.
-
-Available only for admin users.
-*/
+// GetUserByIDHandler returns a handler function that returns a single user by ID.
+//
+//	@Summary		Get a user by ID (admin only)
+//	@Description	Retrieve a user, including its details and roles.
+//	@Tags			users
+//	@Produce		json
+//	@Param			id	path		string					true	"User ID"
+//	@Success		200	{object}	models.UserResponse		"User details"
+//	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
+//	@Failure		404	{object}	models.ErrorResponse	"Not Found"
+//	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
+//	@Security		BearerAuth
+//	@Router			/users/{id} [get]
 func GetUserByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !isAdmin(r) {
-			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
+			writeErrorResponse(w, http.StatusForbidden, "Insufficient permissions.")
 			return
 		}
 
-		// parse the user id from the url
+		// parse id from URL
 		vars := mux.Vars(r)
 		userId, ok := vars["id"]
 		if !ok {
-			handleError(w, http.StatusBadRequest, "User ID not provided in the url", nil)
+			writeErrorResponse(w, http.StatusBadRequest, "User ID not provided in the URL.")
 			return
 		}
 
-		// query to get all the information about the user
-		query := `SELECT
-				u.id,
-				u.name,
-				u.surname,
-				u.username,
-				u.email,
-				u.last_login,
-				u.created_at,
-				u.is_active,
-				r.name AS role_name
+		// find user with the given ID
+		query := `
+			SELECT
+				u.id, u.name, u.surname, u.username, u.email,
+				u.last_login, u.created_at, u.is_active,
+				r.name
 			FROM users u
 			JOIN roles r ON u.role_id = r.id
-			WHERE u.id = $1`
-
-		var roleName string
-		user := models.User{}
-
-		// query the database and return any errors during the Scan
+			WHERE u.id = $1
+		`
+		user := models.UserResponse{}
 		row := pool.QueryRow(r.Context(), query, userId)
-		err := row.Scan(
+		if err := row.Scan(
 			&user.ID,
 			&user.Name,
 			&user.Surname,
@@ -135,87 +121,62 @@ func GetUserByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			&user.LastLogin,
 			&user.CreatedAt,
 			&user.IsActive,
-			&roleName,
-		)
-
-		if err == pgx.ErrNoRows {
-			handleError(w, http.StatusNotFound, "User not found", nil)
-			return
-		}
-		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to fetch user", err)
+			&user.RoleName,
+		); err != nil {
+			if err == pgx.ErrNoRows {
+				writeErrorResponse(w, http.StatusNotFound, "User not found.")
+				return
+			}
+			writeErrorResponse(w, http.StatusInternalServerError, "Failed to parse user data.")
 			return
 		}
 
-		writeJSONResponse(w, http.StatusOK, map[string]interface{}{
-			"id":         user.ID,
-			"name":       user.Name,
-			"surname":    user.Surname,
-			"username":   user.Username,
-			"email":      user.Email,
-			"last_login": user.LastLogin,
-			"created_at": user.CreatedAt,
-			"is_active":  user.IsActive,
-			"role_name":  roleName,
-		})
+		// return the user
+		writeJSONResponse(w, http.StatusOK, user)
 	}
 }
 
-/*
-Create a new user.
-
-Available only for admin users.
-*/
+// CreateUserHandler creates a single user in the database;
+//
+//	@Summary		Create a new user.
+//	@Description	Retrieve a user, including its details and roles.
+//	@Tags			users
+//	@Produce		json
+//	@Param			id	path		string								true	"User ID"
+//	@Success		200	{object}	models.SuccessResponseCreateUUID	"User details"
+//	@Failure		403	{object}	models.ErrorResponse				"Forbidden"
+//	@Failure		404	{object}	models.ErrorResponse				"Not Found"
+//	@Failure		500	{object}	models.ErrorResponse				"Internal Server Error"
+//	@Security		BearerAuth
+//	@Router			/users [put]
 func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// check if the user is an admin
-		if !isAdmin(r) {
-			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
-			return
-		}
-
-		var user struct {
-			Name     string `json:"name"`
-			Surname  string `json:"surname"`
-			Username string `json:"username"`
-			Email    string `json:"email"`
-			Password string `json:"password"`
-			RoleName string `json:"role_name"`
-			IsActive bool   `json:"is_active"`
-		}
+		isAdmin := isAdmin(r)
 
 		// parse the json request
+		user := models.CreateUserRequest{}
 		if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-			handleError(w, http.StatusBadRequest, "Invalid JSON input", err)
+			writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON input.")
 			return
 		}
 
-		// validate input fields
-		if user.Username == "" || user.Password == "" || user.RoleName == "" {
-			handleError(w, http.StatusBadRequest, "Missing required fields", nil)
-			return
+		status, err := validateCreateUserPayload(isAdmin, user)
+		if status != 200 && err != nil {
+			writeErrorResponse(w, status, err.Error())
 		}
 
 		// in case user already exists
-		if err := checkDuplicateUsername(r.Context(), pool, user.Username, nil); err != nil {
-			handleError(w, http.StatusConflict, "Username already exists", err)
+		roleId, err := getRoleIdIfNotDuplicate(r.Context(), pool, user.Username)
+		if err != nil {
+			writeErrorResponse(w, roleId, err.Error())
 			return
 		}
 
 		// hash the password
-		passwordHash, err := bcrypt.GenerateFromPassword(
-			[]byte(user.Password),
-			bcrypt.DefaultCost,
-		)
+		passwordHash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to hash password", err)
-			return
-		}
-
-		// fetch the role ID associated with the role name
-		roleId, err := FetchRoleId(r.Context(), pool, user.RoleName)
-		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to fetch user roles", err)
+			writeErrorResponse(w, http.StatusInternalServerError, "Failed to hash the password.")
 			return
 		}
 
@@ -223,135 +184,124 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		var userId string
 		query := `
 			INSERT INTO Users
-				(name, surname, username,
-				email, last_login, created_at,
-				password_hash, role_id, is_active)
+				(name, surname, username, email, last_login, created_at, is_active,
+				password_hash, role_id)
 			VALUES ($1, $2, $3, $4, NOW(), NOW(), $5, $6, $7)
 			RETURNING id
 		`
 
 		// execute the query
-		err = pool.QueryRow(
-			r.Context(),
-			query,
+		if err := pool.QueryRow(
+			r.Context(), query,
 			user.Name,
 			user.Surname,
 			user.Username,
 			user.Email,
-			passwordHash,
-			roleId,
 			user.IsActive,
-		).Scan(&userId)
-		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to create user", err)
+			passwordHash, roleId,
+		).Scan(&userId); err != nil {
+			writeErrorResponse(w, http.StatusInternalServerError, "Failed to create the user.")
 			return
 		}
 
 		writeJSONResponse(
 			w,
 			http.StatusCreated,
-			map[string]interface{}{
-				"message": "User created successfully",
-				"userId":  userId,
-			},
+			models.SuccessResponseCreateUUID{Message: "User created successfully", UUID: userId},
 		)
 	}
 }
 
-/*
-Update existing user.
-
-Available only for admin users.
-*/
+// UpdateUserHandler updates a single user.
+//
+//	@Summary		Update user.
+//	@Description	Update user details (only owner/admin).
+//	@Tags			users
+//	@Param			id	path		string					true	"User ID"
+//	@Success		200	{object}	models.SuccessResponse	"User details"
+//	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
+//	@Failure		404	{object}	models.ErrorResponse	"Not Found"
+//	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
+//	@Security		BearerAuth
+//	@Router			/users/{id} [put]
 func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !isAdmin(r) {
-			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
-			return
-		}
-
 		// parse the user id from the url
 		vars := mux.Vars(r)
 		userId, ok := vars["id"]
 		if !ok {
-			handleError(w, http.StatusBadRequest, "User ID not provided in the query", nil)
+			writeErrorResponse(w, http.StatusBadRequest, "User ID not provided in the query.")
 			return
 		}
 
-		// struct for the request payload
-		var user_request struct {
-			Name     *string `json:"name"`
-			Surname  *string `json:"surname"`
-			Username *string `json:"username"`
-			Password *string `json:"password"`
-			Email    *string `json:"email"`
-			RoleName *string `json:"role_name"`
-			IsActive *bool   `json:"is_active"`
+		// the only ones to update user are admins and owners themselves
+		if !isAdmin(r) && !isOwner(r, userId) {
+			writeErrorResponse(
+				w,
+				http.StatusBadRequest,
+				"Insufficient permissions to update selected user.",
+			)
+			return
 		}
 
 		// decode the body and parse the request
-		if err := json.NewDecoder(r.Body).Decode(&user_request); err != nil {
-			http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		req := models.UpdateUserRequest{}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErrorResponse(w, http.StatusBadRequest, "Invalid request payload.")
 			return
 		}
 
-		// check if the user exists
-		if user_request.Username != nil {
-			if err := checkDuplicateUsername(r.Context(), pool, *user_request.Username, &userId); err != nil {
-				handleError(w, http.StatusConflict, "Username already exists", err)
-				return
-			}
-		}
-
-		// building the update query
+		// build update query
 		query := `UPDATE users SET `
 		args := []interface{}{}
 		idx := 1
 
-		var hashedPassword *string
-
-		if user_request.Name != nil {
-			query += fmt.Sprintf("name = $%d, ", idx)
-			args = append(args, *user_request.Name)
-			idx++
-		}
-		if user_request.Surname != nil {
-			query += fmt.Sprintf("surname = $%d, ", idx)
-			args = append(args, *user_request.Surname)
-			idx++
-		}
-		if user_request.Username != nil {
-			query += fmt.Sprintf("username = $%d, ", idx)
-			args = append(args, *user_request.Surname)
-			idx++
-		}
-		if user_request.Password != nil {
-			hashed, err := bcrypt.GenerateFromPassword(
-				[]byte(*user_request.Password),
-				bcrypt.DefaultCost,
-			)
-			if err != nil {
-				handleError(w, http.StatusInternalServerError, "Failed to hash password", err)
+		if req.Username != nil {
+			if status, err := isDuplicate(r.Context(), pool, *req.Username, userId); err != nil {
+				writeErrorResponse(w, status, err.Error())
 				return
 			}
+			query += fmt.Sprintf("username = $%d, ", idx)
+			args = append(args, *req.Username)
+			idx++
+		}
+		if req.Name != nil {
+			query += fmt.Sprintf("name = $%d, ", idx)
+			args = append(args, *req.Name)
+			idx++
+		}
+		if req.Surname != nil {
+			query += fmt.Sprintf("surname = $%d, ", idx)
+			args = append(args, *req.Surname)
+			idx++
+		}
+		if req.Password != nil {
+			hashed, err := bcrypt.GenerateFromPassword(
+				[]byte(*req.Password),
+				bcrypt.DefaultCost,
+			)
+
+			if err != nil {
+				writeErrorResponse(w, http.StatusInternalServerError, "Failed to hash password.")
+				return
+			}
+
 			hashedStr := string(hashed)
-			hashedPassword = &hashedStr
+			req.Password = &hashedStr
 
 			query += fmt.Sprintf("password_hash = $%d, ", idx)
-			args = append(args, *hashedPassword)
+			args = append(args, *req.Password)
 			idx++
 		}
-		if user_request.Email != nil {
+		if req.Email != nil {
 			query += fmt.Sprintf("email = $%d, ", idx)
-			args = append(args, *user_request.Email)
+			args = append(args, *req.Email)
 			idx++
 		}
-		if user_request.RoleName != nil {
-
-			// fetch the role ID associated with the role name
-			roleId, err := FetchRoleId(r.Context(), pool, *user_request.RoleName)
+		if req.RoleName != nil {
+			roleId, err := fetchRoleId(r.Context(), pool, *req.RoleName)
 			if err != nil {
-				http.Error(w, "Failed to fetch user roles", http.StatusInternalServerError)
+				writeErrorResponse(w, roleId, err.Error())
 				return
 			}
 
@@ -359,9 +309,9 @@ func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, roleId)
 			idx++
 		}
-		if user_request.IsActive != nil {
+		if req.IsActive != nil {
 			query += fmt.Sprintf("is_active = $%d, ", idx)
-			args = append(args, *user_request.IsActive)
+			args = append(args, *req.IsActive)
 			idx++
 		}
 
@@ -372,7 +322,7 @@ func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		// execute the query
 		_, err := pool.Exec(r.Context(), query, args...)
 		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to update user", err)
+			writeErrorResponse(w, http.StatusInternalServerError, "Failed to update user.")
 			return
 		}
 
@@ -380,28 +330,40 @@ func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		writeJSONResponse(
 			w,
 			http.StatusOK,
-			map[string]string{"message": "User updated successfully"},
+			models.SuccessResponse{Message: "User updated successfully"},
 		)
 	}
 }
 
-/*
-Delete user by ID.
-
-Available only for admin users.
-*/
+// DeleteUserHandler deletes specified user
+//
+//	@Summary		Delete user.
+//	@Description	Deletes user from the database (only owner/admin).
+//	@Tags			users
+//	@Param			id	path		string					true	"User ID"
+//	@Success		200	{object}	models.SuccessResponse	"User details"
+//	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
+//	@Failure		404	{object}	models.ErrorResponse	"Not Found"
+//	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
+//	@Security		BearerAuth
+//	@Router			/users/{id} [delete]
 func DeleteUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !isAdmin(r) {
-			handleError(w, http.StatusForbidden, "Forbidden: Insufficient permissions", nil)
-			return
-		}
-
 		// parse the user id from the url
 		vars := mux.Vars(r)
 		userId, ok := vars["id"]
 		if !ok {
-			handleError(w, http.StatusBadRequest, "User ID not provided in the url", nil)
+			writeErrorResponse(w, http.StatusBadRequest, "User ID not provided in the URL.")
+			return
+		}
+
+		// only available for admins and owners, just as the update
+		if !isAdmin(r) && !isOwner(r, userId) {
+			writeErrorResponse(
+				w,
+				http.StatusBadRequest,
+				"Insufficient permissions to delete selected user.",
+			)
 			return
 		}
 
@@ -409,15 +371,14 @@ func DeleteUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		query := `DELETE FROM users WHERE id = $1`
 		_, err := pool.Exec(r.Context(), query, userId)
 		if err != nil {
-			handleError(w, http.StatusInternalServerError, "Failed to delete user", err)
+			writeErrorResponse(w, http.StatusInternalServerError, "Failed to delete user.")
 			return
 		}
 
-		// write response
 		writeJSONResponse(
 			w,
 			http.StatusOK,
-			map[string]string{"message": "User deleted successfully"},
+			models.SuccessResponse{Message: "User deleted successfully"},
 		)
 	}
 }

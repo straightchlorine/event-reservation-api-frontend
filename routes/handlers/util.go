@@ -254,7 +254,7 @@ func insertLocation(
 
 // Check if a location exists within the database, if it does not, insert it.
 func getLocationID(
-	r *http.Request, w http.ResponseWriter, tx pgx.Tx,
+	r *http.Request, tx pgx.Tx,
 	address *string,
 	stadium *string,
 	capacity *int,
@@ -292,7 +292,7 @@ func getLocationID(
 }
 
 // Utilitity to convert a date string to RFC3339 format.
-func dateToRFC3339(w http.ResponseWriter, date string) (string, error) {
+func dateToRFC3339(date string) (string, error) {
 	const customDateFormat = "2006-01-02 15:04"
 	var parsedDate time.Time
 
@@ -329,7 +329,7 @@ func writeErrorResponse(w http.ResponseWriter, status int, message string) {
 	})
 }
 
-// Helper function to check admin permissions.
+// Verify if currently logged in user has admin permissions.
 func isAdmin(r *http.Request) bool {
 	claims, err := middlewares.GetClaimsFromContext(r.Context())
 	if err != nil {
@@ -339,14 +339,34 @@ func isAdmin(r *http.Request) bool {
 	return ok && role == "ADMIN"
 }
 
-// Helper function to check registered user permissions.
-func isRegistered(r *http.Request) bool {
+// Verify if currently logged in user has permissions of registered user or higher.
+func isOverUnregistered(r *http.Request) bool {
 	claims, err := middlewares.GetClaimsFromContext(r.Context())
 	if err != nil {
 		return false
 	}
 	role, ok := claims["role"].(string)
 	return ok && (role == "REGISTERED" || role == "ADMIN")
+}
+
+// Verify if currently logged in user is a registered user.
+func isRegistered(r *http.Request) bool {
+	claims, err := middlewares.GetClaimsFromContext(r.Context())
+	if err != nil {
+		return false
+	}
+	role, ok := claims["role"].(string)
+	return ok && role == "REGISTERED"
+}
+
+// Verify if currently logged in user is the owner of the user.
+func isOwner(r *http.Request, userID string) bool {
+	claims, err := middlewares.GetClaimsFromContext(r.Context())
+	if err != nil {
+		return false
+	}
+	userId, ok := claims["userID"].(string)
+	return ok && userId == userID
 }
 
 // Get user UUID from the request context.
@@ -374,41 +394,89 @@ func FetchRole(ctx context.Context, pool *pgxpool.Pool, roleID int) (string, err
 }
 
 // Fetch the role ID associated with a given role name.
-func FetchRoleId(ctx context.Context, pool *pgxpool.Pool, roleName string) (int, error) {
+// If failed returns Internal Server Error code along with err.
+func fetchRoleId(ctx context.Context, pool *pgxpool.Pool, roleName string) (int, error) {
 	var roleId int
 	query := "SELECT id FROM roles WHERE name = $1"
 	err := pool.QueryRow(ctx, query, strings.ToUpper(roleName)).Scan(&roleId)
 	if err != nil {
-		return -1, err
+		return http.StatusInternalServerError, err
 	}
 	return roleId, nil
 }
 
-// Check if a username already exists, excluding a specific ID if provided.
-func checkDuplicateUsername(
+// Verify if user can be created from the fields passed in the payload.
+func validateCreateUserPayload(
+	isAdmin bool,
+	user models.CreateUserRequest,
+) (int, error) {
+
+	// check if user has permissions to create an admin user
+	if user.RoleName == "ADMIN" && !isAdmin {
+		return http.StatusForbidden, fmt.Errorf("Insufficient permissions to create an admin user.")
+	}
+
+	// validate input fields
+	if user.Username == "" || user.Password == "" || user.RoleName == "" {
+		return http.StatusBadRequest, fmt.Errorf("Missing required fields.")
+	}
+
+	return 200, nil
+}
+
+// Return the role name if the username is not a duplicate.
+// If error is caught, instead of roleId, http status is returned.
+func getRoleIdIfNotDuplicate(
 	ctx context.Context,
 	pool *pgxpool.Pool,
 	username string,
-	excludeID *string,
-) error {
-	var query string
+) (int, error) {
 	var args []interface{}
 
-	if excludeID == nil {
-		query = "SELECT id FROM users WHERE username = $1 LIMIT 1"
-		args = append(args, username)
-	} else {
-		query = "SELECT id FROM users WHERE username = $1 AND id != $2 LIMIT 1"
-		args = append(args, username, *excludeID)
-	}
+	query := `
+		SELECT
+			u.id
+			r.id
+		FROM users u
+		JOIN roles r ON u.role_id = r.id
+		WHERE username = $1
+	`
+	args = append(args, username)
 
 	var existingID string
-	err := pool.QueryRow(ctx, query, args...).Scan(&existingID)
+	var roleId int
+	err := pool.QueryRow(ctx, query, args...).Scan(&existingID, &roleId)
+
 	if err == nil {
-		return fmt.Errorf("username '%s' is already taken", username)
+		return http.StatusConflict, fmt.Errorf("Username '%s' is already taken.", username)
 	}
 	if err == pgx.ErrNoRows {
-		return nil
+		return roleId, nil
 	}
-	return fmt.Errorf("error checking for duplicate username: %w", err)
+	return http.StatusInternalServerError, fmt.Errorf("Failed to check for duplicate username.")
+}
+
+func isDuplicate(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	username string,
+	excludeID string) (int, error) {
+	query := `
+		SELECT
+			u.id
+			r.id
+		FROM users u
+		JOIN roles r ON u.role_id = r.id
+		WHERE username = $1 AND id != $2
+	`
+	var existingID string
+	err := pool.QueryRow(ctx, query, username, excludeID).Scan(&existingID)
+
+	if err == nil {
+		return http.StatusConflict, fmt.Errorf("Username '%s' is already taken.", username)
+	}
+	if err == pgx.ErrNoRows {
+		return -1, nil
+	}
+	return http.StatusInternalServerError, fmt.Errorf("Failed to check for duplicate username.")
 }
