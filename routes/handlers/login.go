@@ -9,27 +9,29 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"event-reservation-api/middlewares"
+	"event-reservation-api/models"
 )
 
-// Expected login payload.
-type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// Response after a successful login.
-type LoginResponse struct {
-	Token string `json:"token"`
-}
-
-// Authenticate the user and return a JWT.
+// Login handler godoc
+//
+//	@Summary			Login to the API
+//	@Description	Pass username and password to authenticate and get a JWT token.
+//	@ID				  	api.login
+//	@Accept				json
+//	@Produce			json
+//	@Param				body	body		models.LoginRequest	true	"Login credentials"
+//	@Success			200		{object}	models.LoginResponse
+//	@Failure			400		{object}	handlers.ErrorResponse	"Bad Request"
+//	@Failure			401		{object}	handlers.ErrorResponse	"Unauthorized"
+//	@Failure			500		{object}	handlers.ErrorResponse	"Internal Server Error"
+//	@Router				/login [post]
 func LoginHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var loginReq LoginRequest
 
 		// parse login request
+		var loginReq models.LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&loginReq); err != nil {
-			http.Error(w, "Invalid request payload", http.StatusBadRequest)
+			writeErrorResponse(w, http.StatusBadRequest, "Invalid request payload.")
 			return
 		}
 
@@ -44,27 +46,42 @@ func LoginHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 		if err := pool.QueryRow(
 			context.Background(), query, loginReq.Username,
 		).Scan(&userID, &hashedPassword, &role); err != nil {
-			http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+			writeErrorResponse(w, http.StatusNotFound, "User not found.")
 			return
 		}
 
 		// check if the password matches the hash
 		if err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(loginReq.Password)); err != nil {
-			http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+			writeErrorResponse(w, http.StatusUnauthorized, "Invalid username or password.")
 			return
 		}
 
 		// get the token validity duration from env variable, otherwise 24 hours
-		tokenString, err := middlewares.GenerateJWT(userID, role, jwtSecret)
-
+		tokenString, exp, err := middlewares.GenerateJWT(userID, role, jwtSecret)
 		if err != nil {
-			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+			writeErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				"Failed to generate access token.",
+			)
 			return
 		}
 
 		// send the token back to client
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Authorization", "Bearer "+tokenString)
-		json.NewEncoder(w).Encode(LoginResponse{Token: tokenString})
+		writeTokenResponse(w, tokenString, exp, userID, loginReq.Username)
 	}
+}
+
+func writeTokenResponse(
+	w http.ResponseWriter,
+	token string,
+	exp int64,
+	userID string,
+	username string,
+) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// append user details to the reponse
+	user := models.UserUsernameID{ID: userID, Username: username}
+	json.NewEncoder(w).Encode(models.LoginResponse{Token: token, Expires: exp, User: user})
 }

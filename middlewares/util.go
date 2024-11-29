@@ -37,23 +37,30 @@ func generateRandomSecret() (string, error) {
 }
 
 // Creates a JWT token with user claims.
-func GenerateJWT(userID string, role string, secret string) (string, error) {
+func GenerateJWT(userID string, role string, secret string) (string, int64, error) {
 	// get the token validity duration from env variable, otherwise 24 hours
 	validHours, err := getEnvAsInt("TOKEN_VALID_HOURS", 24)
 	if err != nil {
 		log.Printf("Invalid TOKEN_VALID_HOURS, defaulting to 24 hours: %v", err)
 	}
 
+	expirationTime := time.Now().Add(time.Hour * time.Duration(validHours)).Unix()
+
 	// generate the claims
 	claims := jwt.MapClaims{
 		"userID": userID,
 		"role":   role,
-		"exp":    time.Now().Add(time.Hour * time.Duration(validHours)).Unix(),
+		"exp":    expirationTime,
 	}
 
 	// create the JWT token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(secret))
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to sign token: %w", err)
+	}
+
+	return tokenString, expirationTime, nil
 }
 
 // Validate the JWT token from the Authorization header
