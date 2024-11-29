@@ -71,3 +71,13 @@ type UserResponse struct {
 	RoleName  int       `json:"role_id"`
 	IsActive  bool      `json:"is_active"`
 }
+
+type ReservationResponse struct {
+	ID           string           `json:"id"`
+	Username     string           `json:"user"`
+	CreatedAt    time.Time        `json:"created_at"`
+	TotalTickets int              `json:"total_tickets"`
+	Status       string           `json:"status"`
+	Event        EventResponse    `json:"event"`
+	Tickets      []TicketResponse `json:"tickets"`
+}

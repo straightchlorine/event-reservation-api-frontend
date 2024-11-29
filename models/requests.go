@@ -33,6 +33,25 @@ type CreateUserRequest struct {
 	IsActive bool   `json:"is_active"`
 }
 
+// Structure of a valid payload to create a reservation.
+type CreateReservationPayload struct {
+	EventID int `json:"event_id"`
+	Tickets []struct {
+		Type string `json:"type"`
+	} `json:"tickets"`
+}
+
+// Strudture of a valid request to the database
+type ReservationRequest struct {
+	UserID       string `json:"user_id"`
+	EventID      int    `json:"event_id"`
+	TotalTickets int    `json:"total_tickets"`
+	StatusID     int    `json:"status_id"`
+	Tickets      []struct {
+		Type string `json:"type"`
+	} `json:"tickets"`
+}
+
 // Expected update location payload.
 type UpdateLocationRequest struct {
 	Address  *string `json:"address,omitempty"`

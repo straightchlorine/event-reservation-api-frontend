@@ -158,15 +158,15 @@ func fetchReservationDetails(
 }
 
 // Validate the reservation request payload.
-func validateReservationRequest(req models.ReservationPayload) error {
+func validateReservationRequest(req models.CreateReservationPayload) error {
 	if req.EventID <= 0 {
 		return fmt.Errorf("Invalid input: ensure all fields are non-negative")
 	}
 	return nil
 }
 
-// Fetch tickets for a reservation
-func fetchTicketsForReservation(
+// Fetch tickets attributed to a reservation with provided ID.
+func fetchTickets(
 	ctx context.Context,
 	pool *pgxpool.Pool,
 	reservationID string,
@@ -370,7 +370,7 @@ func isOwner(r *http.Request, userID string) bool {
 }
 
 // Get user UUID from the request context.
-func getUserIDFromContext(ctx context.Context) (string, error) {
+func getUserIdFromContext(ctx context.Context) (string, error) {
 	claims, err := middlewares.GetClaimsFromContext(ctx)
 	if err != nil {
 		return "", err

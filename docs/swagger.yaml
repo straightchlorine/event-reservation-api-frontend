@@ -1,0 +1,941 @@
+basePath: /api/
+definitions:
+  models.CreateEventRequest:
+    properties:
+      available_tickets:
+        type: integer
+      date:
+        type: string
+      location:
+        $ref: '#/definitions/models.CreateLocationRequest'
+      name:
+        type: string
+      price:
+        type: number
+    type: object
+  models.CreateLocationRequest:
+    properties:
+      address:
+        type: string
+      capacity:
+        type: integer
+      country:
+        type: string
+      stadium:
+        type: string
+    type: object
+  models.CreateReservationPayload:
+    properties:
+      event_id:
+        type: integer
+      tickets:
+        items:
+          properties:
+            type:
+              type: string
+          type: object
+        type: array
+    type: object
+  models.ErrorResponse:
+    properties:
+      message:
+        example: Error message
+        type: string
+    type: object
+  models.EventResponse:
+    properties:
+      available_tickets:
+        example: 15000
+        type: integer
+      date:
+        example: "2024-12-31T20:00:00Z"
+        type: string
+      id:
+        example: 1
+        type: integer
+      location:
+        $ref: '#/definitions/models.LocationResponse'
+      name:
+        example: Champions League Final
+        type: string
+      price:
+        example: 99.99
+        type: number
+    type: object
+  models.LocationResponse:
+    properties:
+      address:
+        example: Wembley Park, London
+        type: string
+      capacity:
+        example: 90000
+        type: integer
+      country:
+        example: England
+        type: string
+      id:
+        example: 101
+        type: integer
+      stadium:
+        example: Wembley Stadium
+        type: string
+    type: object
+  models.LoginRequest:
+    properties:
+      password:
+        example: root
+        type: string
+      username:
+        example: root
+        type: string
+    type: object
+  models.LoginResponse:
+    properties:
+      exp:
+        example: 12313123
+        type: integer
+      token:
+        example: jwt-token-string
+        type: string
+      user:
+        $ref: '#/definitions/models.UserUsernameID'
+    type: object
+  models.ReservationResponse:
+    properties:
+      created_at:
+        type: string
+      event:
+        $ref: '#/definitions/models.EventResponse'
+      id:
+        type: string
+      status:
+        type: string
+      tickets:
+        items:
+          $ref: '#/definitions/models.TicketResponse'
+        type: array
+      total_tickets:
+        type: integer
+      user:
+        type: string
+    type: object
+  models.SuccessResponse:
+    properties:
+      message:
+        example: Error message
+        type: string
+    type: object
+  models.SuccessResponseCreate:
+    properties:
+      id:
+        example: 1
+        type: integer
+      message:
+        example: Error message
+        type: string
+    type: object
+  models.SuccessResponseCreateUUID:
+    properties:
+      id:
+        example: 123e4567-e89b-12d3-a456-426614174000
+        type: string
+      message:
+        example: Error message
+        type: string
+    type: object
+  models.TicketResponse:
+    properties:
+      id:
+        type: string
+      price:
+        type: number
+      status:
+        type: string
+      type:
+        type: string
+    type: object
+  models.UpdateEventRequest:
+    properties:
+      available_tickets:
+        type: integer
+      date:
+        type: string
+      location:
+        $ref: '#/definitions/models.UpdateLocationRequest'
+      name:
+        type: string
+      price:
+        type: number
+    type: object
+  models.UpdateLocationRequest:
+    properties:
+      address:
+        type: string
+      capacity:
+        type: integer
+      country:
+        type: string
+      stadium:
+        type: string
+    type: object
+  models.UserResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      last_login:
+        type: string
+      name:
+        type: string
+      role_id:
+        type: integer
+      surname:
+        type: string
+      username:
+        type: string
+    type: object
+  models.UserUsernameID:
+    properties:
+      id:
+        example: 123e4567-e89b-12d3-a456-426614174000
+        type: string
+      username:
+        example: root
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Simple API for managing ticket reservations.
+  title: Ticket Reservation API
+  version: "1.0"
+paths:
+  /events:
+    get:
+      description: Retrieve a list of all events with their details and locations.
+      operationId: api.getEvents
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of events
+          schema:
+            items:
+              $ref: '#/definitions/models.EventResponse'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Get all events
+      tags:
+      - events
+    put:
+      consumes:
+      - application/json
+      description: Parse the payload and create a new event with provided dataset.
+      operationId: api.createEvent
+      parameters:
+      - description: Payload to create an event
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateEventRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Event created successfully
+          schema:
+            $ref: '#/definitions/models.SuccessResponseCreate'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Create a new event.
+      tags:
+      - events
+  /events/{id}:
+    delete:
+      description: Delete event by its ID.
+      operationId: api.deleteEvent
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Event deleted successfully
+          schema:
+            $ref: '#/definitions/models.SuccessResponseCreate'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Delete an existing event
+      tags:
+      - events
+    get:
+      description: Retrieve an event with its details and location.
+      operationId: api.getEventByID
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Event details
+          schema:
+            $ref: '#/definitions/models.EventResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Get an event by ID
+      tags:
+      - events
+    put:
+      consumes:
+      - application/json
+      description: Update event details based on the provided payload.
+      operationId: api.updateEvent
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Payload to update an event
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateEventRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Event updated successfully
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Update an existing event
+      tags:
+      - events
+  /locations:
+    get:
+      description: Retrieve a list of all locations.
+      operationId: api.getLocations
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of locations
+          schema:
+            items:
+              $ref: '#/definitions/models.LocationResponse'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Get all locations
+      tags:
+      - locations
+    put:
+      consumes:
+      - application/json
+      description: Parse the payload and create a new location with provided dataset.
+      operationId: api.createLocation
+      parameters:
+      - description: Payload to create a location
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateLocationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Location created successfully
+          schema:
+            $ref: '#/definitions/models.SuccessResponseCreate'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Create a new location.
+      tags:
+      - locations
+  /locations/{id}:
+    delete:
+      description: Delete a location by its ID.
+      operationId: api.deleteLocation
+      parameters:
+      - description: Location ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Event deleted successfully
+          schema:
+            $ref: '#/definitions/models.SuccessResponseCreate'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Delete an existing location
+      tags:
+      - locations
+    get:
+      description: Retrieve a single location by ID.
+      operationId: api.getLocation
+      parameters:
+      - description: Location ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Location details
+          schema:
+            $ref: '#/definitions/models.LocationResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Retrieve a location.
+      tags:
+      - locations
+    put:
+      consumes:
+      - application/json
+      description: Update location details based on the provided payload.
+      operationId: api.updateLocation
+      parameters:
+      - description: Location ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Payload to update a location
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateLocationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Event updated successfully
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Update an existing location
+      tags:
+      - locations
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Pass username and password to authenticate and get a JWT token.
+      operationId: api.login
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully logged in
+          schema:
+            $ref: '#/definitions/models.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Login to the API.
+      tags:
+      - auth
+  /logout:
+    post:
+      description: Invalidate currently used JWT token.
+      operationId: api.logout
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully logged out
+          schema:
+            $ref: '#/definitions/models.LoginResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout from the API (admin or registered user)
+      tags:
+      - auth
+  /reservations:
+    get:
+      description: Retrieve a list of all reservations, including their details and
+        tickets they reserve.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of reservations
+          schema:
+            items:
+              $ref: '#/definitions/models.ReservationResponse'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List all reservations (admin only)
+      tags:
+      - reservations
+    put:
+      description: Parse provided payload and create reservation and tickets within
+        the database.
+      parameters:
+      - description: Payload to create a reservation
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateReservationPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Reservation created successfully
+          schema:
+            $ref: '#/definitions/models.SuccessResponseCreateUUID'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a reservation (registered/admin only)
+      tags:
+      - reservations
+  /reservations/{id}/tickets:
+    get:
+      description: Retrieve all tickets associated with a specific reservation by
+        its ID.
+      parameters:
+      - description: Reservation ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of tickets for the reservation
+          schema:
+            items:
+              $ref: '#/definitions/models.TicketResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List tickets for a reservation
+      tags:
+      - reservatons
+  /reservations/user:
+    get:
+      description: Retrieve a list of current user's reservations along with  details
+        and tickets they reserve.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of reservations for the user
+          schema:
+            items:
+              $ref: '#/definitions/models.ReservationResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List user reservations
+      tags:
+      - reservations
+  /reservations/user/{id}:
+    get:
+      description: Retrieve a list of all reservations made by a specific user, including
+        their details and tickets they reserve.
+      parameters:
+      - description: User ID
+        in: query
+        name: user_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of reservations for the user
+          schema:
+            items:
+              $ref: '#/definitions/models.ReservationResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List user reservations (admin only)
+      tags:
+      - reservations
+  /reservations{id}:
+    get:
+      description: Delete a single reservation along with its tickets from the database.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Reservation details
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a reservation by ID (admin only)
+      tags:
+      - reservations
+  /users:
+    get:
+      description: Retrieve a list of all users, including their details and roles.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of users
+          schema:
+            items:
+              $ref: '#/definitions/models.UserResponse'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List all users (admin only)
+      tags:
+      - users
+    put:
+      description: Retrieve a user, including its details and roles.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User details
+          schema:
+            $ref: '#/definitions/models.SuccessResponseCreateUUID'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new user.
+      tags:
+      - users
+  /users/{id}:
+    delete:
+      description: Deletes user from the database (only owner/admin).
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: User details
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete user.
+      tags:
+      - users
+    get:
+      description: Retrieve a user, including its details and roles.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User details
+          schema:
+            $ref: '#/definitions/models.UserResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a user by ID (admin only)
+      tags:
+      - users
+    put:
+      description: Update user details (only owner/admin).
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: User details
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update user.
+      tags:
+      - users
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

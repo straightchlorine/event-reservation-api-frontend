@@ -64,8 +64,12 @@ func setupReservationRoutes(
 	resRouter.HandleFunc("", handlers.CreateReservationHandler(pool)).Methods(http.MethodPut)
 	resRouter.HandleFunc("", handlers.GetReservationHandler(pool)).Methods(http.MethodGet)
 	resRouter.HandleFunc("/{id}", handlers.GetReservationByIDHandler(pool)).Methods(http.MethodGet)
+	resRouter.HandleFunc("/{id}/tickets", handlers.GetReservationByIDHandler(pool)).
+		Methods(http.MethodGet)
 	resRouter.HandleFunc("/{id}", handlers.DeleteReservationHandler(pool)).
 		Methods(http.MethodDelete)
+	resRouter.HandleFunc("/user", handlers.GetCurrentUserReservationsHandler(pool)).
+		Methods(http.MethodGet)
 
 	// Uncomment and implement when ready
 	// resRouter.HandleFunc("/{id}", handlers.UpdateReservationHandler(pool)).Methods(http.MethodPut)

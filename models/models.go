@@ -12,25 +12,6 @@ type BlacklistEntry struct {
 	ExpiresAt time.Time
 }
 
-// Structure of a valid reservation request
-type ReservationPayload struct {
-	EventID int `json:"event_id"`
-	Tickets []struct {
-		Type string `json:"type"`
-	} `json:"tickets"`
-}
-
-// Strudture of a valid request to the database
-type ReservationRequest struct {
-	UserID       string `json:"user_id"`
-	EventID      int    `json:"event_id"`
-	TotalTickets int    `json:"total_tickets"`
-	StatusID     int    `json:"status_id"`
-	Tickets      []struct {
-		Type string `json:"type"`
-	} `json:"tickets"`
-}
-
 // Ticket, as its returned to user
 type TicketResponse struct {
 	ID     string  `json:"id"`
@@ -44,17 +25,6 @@ type LocationUpdatePayload struct {
 	Address  *string `json:"address,omitempty"`
 	Country  *string `json:"country,omitempty"`
 	Capacity *int    `json:"capacity,omitempty"`
-}
-
-// Reservation represents the structure of a reservation.
-type ReservationResponse struct {
-	ID           string           `json:"id"`
-	Username     string           `json:"user"`
-	CreatedAt    time.Time        `json:"created_at"`
-	TotalTickets int              `json:"total_tickets"`
-	Status       string           `json:"status"`
-	Event        EventResponse    `json:"event"`
-	Tickets      []TicketResponse `json:"tickets"`
 }
 
 // Role table record
