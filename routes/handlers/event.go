@@ -20,7 +20,7 @@ import (
 //	@ID				api.getEvents
 //	@Tags			events
 //	@Produce		json
-//	@Success		200	{object}		models.EventsResponse	"List of events"
+//	@Success		200	{object}	models.EventsResponse	"List of events"
 //	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
 //	@Failure		404	{object}	models.ErrorResponse	"Not Found"
 //	@Router			/events [get]

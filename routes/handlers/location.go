@@ -20,9 +20,9 @@ import (
 //	@ID				api.getLocations
 //	@Tags			locations
 //	@Produce		json
-//	@Success		200	{object}		models.LocationsResponse	"List of locations"
-//	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
-//	@Failure		404	{object}	models.ErrorResponse	"Not Found"
+//	@Success		200	{object}	models.LocationsResponse	"List of locations"
+//	@Failure		500	{object}	models.ErrorResponse		"Internal Server Error"
+//	@Failure		404	{object}	models.ErrorResponse		"Not Found"
 //	@Router			/locations [get]
 func GetLocationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -233,7 +233,7 @@ func UpdateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		// decode the body and parse the request
-		input := models.LocationUpdatePayload{}
+		input := models.UpdateLocationRequest{}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON input.")
 			return

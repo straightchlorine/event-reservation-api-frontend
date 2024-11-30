@@ -30,10 +30,7 @@ const docTemplate = `{
                     "200": {
                         "description": "List of events",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.EventResponse"
-                            }
+                            "$ref": "#/definitions/models.EventsResponse"
                         }
                     },
                     "404": {
@@ -263,10 +260,7 @@ const docTemplate = `{
                     "200": {
                         "description": "List of locations",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.LocationResponse"
-                            }
+                            "$ref": "#/definitions/models.LocationsResponse"
                         }
                     },
                     "404": {
@@ -591,10 +585,7 @@ const docTemplate = `{
                     "200": {
                         "description": "List of reservations",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.ReservationResponse"
-                            }
+                            "$ref": "#/definitions/models.ReservationsResponse"
                         }
                     },
                     "403": {
@@ -630,7 +621,7 @@ const docTemplate = `{
                 "tags": [
                     "reservations"
                 ],
-                "summary": "Create a reservation (registered/admin only)",
+                "summary": "Create a reservation (owner/admin only)",
                 "parameters": [
                     {
                         "description": "Payload to create a reservation",
@@ -677,22 +668,71 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retrieve a list of current user's reservations along with  details and tickets they reserve.",
+                "description": "Retrieve a list of current user's reservations along with details and tickets they reserve.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "reservations"
                 ],
-                "summary": "List user reservations",
+                "summary": "List user reservations for currently logged in user",
                 "responses": {
                     "200": {
                         "description": "List of reservations for the user",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.ReservationResponse"
-                            }
+                            "$ref": "#/definitions/models.ReservationsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/reservations/user/tickets": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve a list of current user's tickets.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reservations"
+                ],
+                "summary": "List user tickets for currently logged in user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of tickets belonging to the user",
+                        "schema": {
+                            "$ref": "#/definitions/models.UserTicketsResponse"
                         }
                     },
                     "400": {
@@ -730,7 +770,7 @@ const docTemplate = `{
                 "tags": [
                     "reservations"
                 ],
-                "summary": "List user reservations (admin only)",
+                "summary": "List user reservations (admin/owner only)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -744,14 +784,199 @@ const docTemplate = `{
                     "200": {
                         "description": "List of reservations for the user",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.ReservationResponse"
-                            }
+                            "$ref": "#/definitions/models.ReservationsResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/reservations/user/{id}/tickets": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve a list of user's tickets.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reservations"
+                ],
+                "summary": "List user tickets (admin/owner only)",
+                "responses": {
+                    "200": {
+                        "description": "List of tickets belonging to the user",
+                        "schema": {
+                            "$ref": "#/definitions/models.UserTicketsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/reservations/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve a single reservation, including their details and tickets they reserve.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reservations"
+                ],
+                "summary": "Get a reservation by ID (admin/owner only)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Reservation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reservation details",
+                        "schema": {
+                            "$ref": "#/definitions/models.ReservationResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a single reservation along with its tickets from the database.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reservations"
+                ],
+                "summary": "Delete a reservation by ID (admin only)",
+                "responses": {
+                    "200": {
+                        "description": "Reservation deleted successfully",
+                        "schema": {
+                            "$ref": "#/definitions/models.SuccessResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/reservations/{id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Set statuses of reservation and its tickets to cancelled.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reservations"
+                ],
+                "summary": "Cancel a reservation (owner/admin only)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Reservation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reservation canceled successfully",
+                        "schema": {
+                            "$ref": "#/definitions/models.SuccessResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -783,9 +1008,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "reservatons"
+                    "reservations"
                 ],
-                "summary": "List tickets for a reservation",
+                "summary": "List tickets for a reservation (owner/admin only)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -799,57 +1024,11 @@ const docTemplate = `{
                     "200": {
                         "description": "List of tickets for the reservation",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.TicketResponse"
-                            }
+                            "$ref": "#/definitions/models.ReservationTicketsResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/reservations{id}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a single reservation along with its tickets from the database.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "reservations"
-                ],
-                "summary": "Delete a reservation by ID (admin only)",
-                "responses": {
-                    "200": {
-                        "description": "Reservation details",
-                        "schema": {
-                            "$ref": "#/definitions/models.SuccessResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -888,10 +1067,7 @@ const docTemplate = `{
                     "200": {
                         "description": "List of users",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.UserResponse"
-                            }
+                            "$ref": "#/definitions/models.UsersResponse"
                         }
                     },
                     "403": {
@@ -928,15 +1104,6 @@ const docTemplate = `{
                     "users"
                 ],
                 "summary": "Create a new user.",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "User ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "User details",
@@ -1038,7 +1205,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "User details",
+                        "description": "User updated successfully",
                         "schema": {
                             "$ref": "#/definitions/models.SuccessResponse"
                         }
@@ -1117,19 +1284,23 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "available_tickets": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 20000
                 },
                 "date": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2024-12-31T20:00:00Z"
                 },
                 "location": {
                     "$ref": "#/definitions/models.CreateLocationRequest"
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Champions League Final"
                 },
                 "price": {
-                    "type": "number"
+                    "type": "number",
+                    "example": 99.99
                 }
             }
         },
@@ -1137,16 +1308,20 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "address": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "123 Main St"
                 },
                 "capacity": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 50000
                 },
                 "country": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "USA"
                 },
                 "stadium": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "National Stadium"
                 }
             }
         },
@@ -1154,7 +1329,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "event_id": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 101
                 },
                 "tickets": {
                     "type": "array",
@@ -1162,7 +1338,8 @@ const docTemplate = `{
                         "type": "object",
                         "properties": {
                             "type": {
-                                "type": "string"
+                                "type": "string",
+                                "example": "STANDARD"
                             }
                         }
                     }
@@ -1174,7 +1351,7 @@ const docTemplate = `{
             "properties": {
                 "message": {
                     "type": "string",
-                    "example": "Error message"
+                    "example": "An error occurred"
                 }
             }
         },
@@ -1206,6 +1383,17 @@ const docTemplate = `{
                 }
             }
         },
+        "models.EventsResponse": {
+            "type": "object",
+            "properties": {
+                "events": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.EventResponse"
+                    }
+                }
+            }
+        },
         "models.LocationResponse": {
             "type": "object",
             "properties": {
@@ -1231,16 +1419,27 @@ const docTemplate = `{
                 }
             }
         },
+        "models.LocationsResponse": {
+            "type": "object",
+            "properties": {
+                "locations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.LocationResponse"
+                    }
+                }
+            }
+        },
         "models.LoginRequest": {
             "type": "object",
             "properties": {
                 "password": {
                     "type": "string",
-                    "example": "root"
+                    "example": "securepassword"
                 },
                 "username": {
                     "type": "string",
-                    "example": "root"
+                    "example": "user123"
                 }
             }
         },
@@ -1249,7 +1448,7 @@ const docTemplate = `{
             "properties": {
                 "exp": {
                     "type": "integer",
-                    "example": 12313123
+                    "example": 1683649261
                 },
                 "token": {
                     "type": "string",
@@ -1264,16 +1463,19 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "created_at": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2024-12-01T15:30:00Z"
                 },
                 "event": {
                     "$ref": "#/definitions/models.EventResponse"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "res123"
                 },
                 "status": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "CONFIRMED"
                 },
                 "tickets": {
                     "type": "array",
@@ -1282,10 +1484,42 @@ const docTemplate = `{
                     }
                 },
                 "total_tickets": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 5
                 },
                 "user": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "johndoe"
+                }
+            }
+        },
+        "models.ReservationTicketsResponse": {
+            "type": "object",
+            "properties": {
+                "reservation_id": {
+                    "type": "string",
+                    "example": "res123"
+                },
+                "tickets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TicketResponse"
+                    }
+                },
+                "user": {
+                    "type": "string",
+                    "example": "johndoe"
+                }
+            }
+        },
+        "models.ReservationsResponse": {
+            "type": "object",
+            "properties": {
+                "reservations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ReservationResponse"
+                    }
                 }
             }
         },
@@ -1294,7 +1528,7 @@ const docTemplate = `{
             "properties": {
                 "message": {
                     "type": "string",
-                    "example": "Error message"
+                    "example": "Operation successful"
                 }
             }
         },
@@ -1307,7 +1541,7 @@ const docTemplate = `{
                 },
                 "message": {
                     "type": "string",
-                    "example": "Error message"
+                    "example": "Object created successfully"
                 }
             }
         },
@@ -1320,7 +1554,7 @@ const docTemplate = `{
                 },
                 "message": {
                     "type": "string",
-                    "example": "Error message"
+                    "example": "Object created successfully"
                 }
             }
         },
@@ -1328,16 +1562,20 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "abc123"
                 },
                 "price": {
-                    "type": "number"
+                    "type": "number",
+                    "example": 150
                 },
                 "status": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "available"
                 },
                 "type": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "STANDARD"
                 }
             }
         },
@@ -1345,19 +1583,23 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "available_tickets": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 15000
                 },
                 "date": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2024-12-25T18:00:00Z"
                 },
                 "location": {
                     "$ref": "#/definitions/models.UpdateLocationRequest"
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Christmas Special"
                 },
                 "price": {
-                    "type": "number"
+                    "type": "number",
+                    "example": 49.99
                 }
             }
         },
@@ -1365,16 +1607,20 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "address": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "456 Elm St"
                 },
                 "capacity": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 75000
                 },
                 "country": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Canada"
                 },
                 "stadium": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Maple Leaf Stadium"
                 }
             }
         },
@@ -1382,31 +1628,83 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "created_at": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2024-01-01T10:00:00Z"
                 },
                 "email": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "johndoe@example.com"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "123e4567-e89b-12d3-a456-426614174000"
                 },
                 "is_active": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "example": true
                 },
                 "last_login": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2024-12-01T15:30:00Z"
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "John"
                 },
                 "role_id": {
-                    "type": "integer"
+                    "type": "string",
+                    "example": "admin"
                 },
                 "surname": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Doe"
                 },
                 "username": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "johndoe"
+                }
+            }
+        },
+        "models.UserTicketResponse": {
+            "type": "object",
+            "properties": {
+                "event": {
+                    "$ref": "#/definitions/models.EventResponse"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "ticket123"
+                },
+                "price": {
+                    "type": "number",
+                    "example": 50
+                },
+                "reservation_id": {
+                    "type": "string",
+                    "example": "res123"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "SOLD"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "STANDARD"
+                }
+            }
+        },
+        "models.UserTicketsResponse": {
+            "type": "object",
+            "properties": {
+                "tickets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.UserTicketResponse"
+                    }
+                },
+                "user_id": {
+                    "type": "string",
+                    "example": "123e4567-e89b-12d3-a456-426614174000"
                 }
             }
         },
@@ -1420,6 +1718,17 @@ const docTemplate = `{
                 "username": {
                     "type": "string",
                     "example": "root"
+                }
+            }
+        },
+        "models.UsersResponse": {
+            "type": "object",
+            "properties": {
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.UserResponse"
+                    }
                 }
             }
         }

@@ -259,7 +259,6 @@ VALUES
 INSERT INTO
   ticket_statuses (name)
 VALUES
-  ('AVAILABLE'),
   ('RESERVED'),
   ('SOLD'),
   ('CANCELLED');

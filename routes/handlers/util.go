@@ -43,15 +43,6 @@ func confirmReservation(
 	tx pgx.Tx,
 	reservationId string,
 ) error {
-	if err := updateReservationStatus(
-		ctx,
-		tx,
-		reservationId,
-		"CONFIRMED",
-	); err != nil {
-		return fmt.Errorf("Failed to update reservation status: %w", err)
-	}
-
 	if err := updateTicketsStatus(
 		ctx,
 		tx,
@@ -59,6 +50,15 @@ func confirmReservation(
 		"SOLD",
 	); err != nil {
 		return fmt.Errorf("Failed to update ticket status: %w", err)
+	}
+
+	if err := updateReservationStatus(
+		ctx,
+		tx,
+		reservationId,
+		"CONFIRMED",
+	); err != nil {
+		return fmt.Errorf("Failed to update reservation status: %w", err)
 	}
 	return nil
 }
@@ -71,7 +71,7 @@ func updateTicketsStatus(
 	status string,
 ) error {
 	query := `
-		UPDATE Tickets
+		UPDATE tickets
 		SET status_id = (
 			SELECT id
 			FROM ticket_statuses
@@ -86,7 +86,7 @@ func updateTicketsStatus(
 		status,
 		resId,
 	); err != nil {
-		return fmt.Errorf("Failed to update reservation status")
+		return fmt.Errorf("Failed to update reservation status.")
 	}
 	return nil
 }
@@ -120,7 +120,7 @@ func updateReservationStatus(
 }
 
 // Substract amount of reserved tickets from the event.
-func substractTicketsFromEvent(
+func setAvailableTickets(
 	ctx context.Context,
 	tx pgx.Tx,
 	eventID int,

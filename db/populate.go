@@ -59,7 +59,6 @@ func fetchUUIDIds(ctx context.Context, pool *pgxpool.Pool, table string) []uuid.
 
 // Add an admin user to the database.
 func AddAdminUser(fake *gofakeit.Faker, pool *pgxpool.Pool) error {
-
 	// get the root user credentials from env
 	root_password := os.Getenv("ROOT_PASSWORD")
 	root_username := os.Getenv("ROOT_NAME")
@@ -83,23 +82,21 @@ func AddAdminUser(fake *gofakeit.Faker, pool *pgxpool.Pool) error {
 	}
 
 	// fill in the root user struct
-	root_user := models.User{
-		Name:         "Root",
-		Surname:      "Root",
-		Username:     root_username,
-		Email:        "root@root.rt",
-		LastLogin:    fake.PastDate(),
-		CreatedAt:    fake.PastDate(),
-		PasswordHash: string(passwordHash),
-		RoleID:       3, // admin role
-		IsActive:     true,
+	root_user := UserPopulate{
+		Name:     "Root",
+		Surname:  "Root",
+		Username: root_username,
+		Email:    "root@root.rt",
+		RoleID:   3, // admin role
+		IsActive: true,
 	}
 
 	// query template for inserting a user
-	query := `INSERT INTO Users (name, surname, username,
-                          email, last_login, created_at,
-                          password_hash, role_id, is_active)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+	query := `
+		INSERT INTO Users (name, surname, username,
+											email, password_hash, role_id,
+											is_active, last_login, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`
 
 	// in case nil is passed, populating is off, so run regular insert
 	if pool != nil {
@@ -110,9 +107,7 @@ func AddAdminUser(fake *gofakeit.Faker, pool *pgxpool.Pool) error {
 			root_user.Surname,
 			root_user.Username,
 			root_user.Email,
-			root_user.LastLogin,
-			root_user.CreatedAt,
-			root_user.PasswordHash,
+			string(passwordHash),
 			root_user.RoleID,
 			root_user.IsActive,
 		)
@@ -124,12 +119,22 @@ func AddAdminUser(fake *gofakeit.Faker, pool *pgxpool.Pool) error {
 	return nil
 }
 
+type UserPopulate struct {
+	Name     string `json:"name"`
+	Surname  string `json:"surname"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	RoleID   int    `json:"role_id"`
+	IsActive bool   `json:"is_active"`
+}
+
 // Populate the database with fake user records.
 func populateUsers(ctx context.Context, pool *pgxpool.Pool) error {
 	fake := gofakeit.New(0)
 
 	// user struct
-	users := make([]models.User, 40)
+	users := make([]UserPopulate, 40)
 
 	// role struct
 	roleIDs := fetchIds(ctx, pool, "Roles")
@@ -147,33 +152,30 @@ func populateUsers(ctx context.Context, pool *pgxpool.Pool) error {
 		}
 
 		// fill the struct
-		users[i] = models.User{
-			Name:         fake.FirstName(),
-			Surname:      fake.LastName(),
-			Username:     fake.Username(),
-			Email:        fake.Email(),
-			LastLogin:    fake.PastDate(),
-			CreatedAt:    fake.PastDate(),
-			PasswordHash: string(passwordHash),
-			RoleID:       roleIDs[i%len(roleIDs)],
-			IsActive:     fake.Bool(),
+		users[i] = UserPopulate{
+			Name:     fake.FirstName(),
+			Surname:  fake.LastName(),
+			Username: fake.Username(),
+			Email:    fake.Email(),
+			RoleID:   roleIDs[i%len(roleIDs)],
+			IsActive: fake.Bool(),
 		}
 
 		// fill the batch with requests
 		batch.Queue(
 			`INSERT INTO Users (name, surname, username,
-                          email, last_login, created_at,
-                          password_hash, role_id, is_active)
+                          email, password_hash, role_id,
+													is_active, last_login, created_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 			users[i].Name,
 			users[i].Surname,
 			users[i].Username,
 			users[i].Email,
-			users[i].LastLogin,
-			users[i].CreatedAt,
-			users[i].PasswordHash,
+			string(passwordHash),
 			users[i].RoleID,
 			users[i].IsActive,
+			fake.PastDate(),
+			fake.PastDate(),
 		)
 	}
 
@@ -196,7 +198,7 @@ func populateLocations(ctx context.Context, pool *pgxpool.Pool) error {
 	fake := gofakeit.New(0)
 
 	// locations struct
-	locations := make([]models.Location, 20)
+	locations := make([]models.CreateLocationRequest, 20)
 
 	// batch insert
 	batch := &pgx.Batch{}
@@ -205,7 +207,7 @@ func populateLocations(ctx context.Context, pool *pgxpool.Pool) error {
 	for i := range locations {
 		fake_stadium := fake.NounCollectiveThing()
 
-		locations[i] = models.Location{
+		locations[i] = models.CreateLocationRequest{
 			Stadium:  strings.ToUpper(string(fake_stadium[0])) + fake_stadium[1:],
 			Address:  fake.Address().Address,
 			Country:  fake.Country(),
@@ -230,6 +232,14 @@ func populateLocations(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
+type EventPopulate struct {
+	Name             string    `json:"name"`
+	Date             time.Time `json:"date"`
+	AvailableTickets int       `json:"available_tickets"`
+	Price            float64   `json:"price"`
+	LocationID       int       `json:"location_id"`
+}
+
 // Populate the database with fake event records.
 func populateEvents(ctx context.Context, pool *pgxpool.Pool) error {
 	fake := gofakeit.New(0)
@@ -238,14 +248,14 @@ func populateEvents(ctx context.Context, pool *pgxpool.Pool) error {
 	locationIDs := fetchIds(ctx, pool, "Locations")
 
 	// event struct
-	events := make([]models.Event, 20)
+	events := make([]EventPopulate, 20)
 
 	// batch insert
 	batch := &pgx.Batch{}
 
 	// fill the struct with fake data
 	for i := range events {
-		events[i] = models.Event{
+		events[i] = EventPopulate{
 			Name:             fake.Country() + "-" + fake.Country(),
 			Date:             fake.FutureDate(),
 			Price:            fake.Price(10, 1000),
@@ -273,6 +283,15 @@ func populateEvents(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
+type ReservationPopulate struct {
+	ID           uuid.UUID `json:"id"`
+	UserID       uuid.UUID `json:"user_id"`
+	EventID      int       `json:"event_id"`
+	CreatedAt    time.Time `json:"created_at"`
+	TotalTickets int       `json:"total_tickets"`
+	StatusID     int       `json:"status_id"`
+}
+
 // Populate the database with fake reservations.
 func populateReservations(ctx context.Context, pool *pgxpool.Pool) error {
 	fake := gofakeit.New(0)
@@ -287,7 +306,7 @@ func populateReservations(ctx context.Context, pool *pgxpool.Pool) error {
 	statusIDs := fetchIds(ctx, pool, "reservation_statuses")
 
 	// reservation struct
-	reservations := make([]models.Reservation, 100)
+	reservations := make([]ReservationPopulate, 100)
 
 	// batch insert
 	batch := &pgx.Batch{}
@@ -296,7 +315,7 @@ func populateReservations(ctx context.Context, pool *pgxpool.Pool) error {
 	for i := range reservations {
 
 		// fill the struct
-		reservations[i] = models.Reservation{
+		reservations[i] = ReservationPopulate{
 			UserID:       userIDs[i%len(userIDs)],
 			EventID:      eventIDs[i%len(eventIDs)],
 			CreatedAt:    fake.PastDate(),
@@ -314,7 +333,6 @@ func populateReservations(ctx context.Context, pool *pgxpool.Pool) error {
 			reservations[i].TotalTickets,
 			reservations[i].StatusID,
 		)
-
 	}
 
 	// send the batch
@@ -325,12 +343,20 @@ func populateReservations(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
+type TicketPopulate struct {
+	ID            int       `json:"id"`
+	ReservationID uuid.UUID `json:"reservation_id"`
+	Price         float64   `json:"price"`
+	TypeID        int       `json:"type_id"`
+	StatusID      int       `json:"status_id"`
+}
+
 // Populate the database with fake tickets.
 func populateTickets(ctx context.Context, pool *pgxpool.Pool) error {
 	fake := gofakeit.New(0)
 
 	// ticket struct
-	tickets := make([]models.Ticket, 100)
+	tickets := make([]TicketPopulate, 100)
 
 	// fetch reservation ids
 	reservationIDs := fetchUUIDIds(ctx, pool, "Reservations")
@@ -348,7 +374,7 @@ func populateTickets(ctx context.Context, pool *pgxpool.Pool) error {
 	for i := range tickets {
 
 		// fill the struct
-		tickets[i] = models.Ticket{
+		tickets[i] = TicketPopulate{
 			ReservationID: reservationIDs[i%len(reservationIDs)],
 			Price:         fake.Price(10, 1000),
 			TypeID:        ticketTypeIDs[i%len(ticketTypeIDs)],

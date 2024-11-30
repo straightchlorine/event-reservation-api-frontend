@@ -19,7 +19,7 @@ import (
 //	@Description	Retrieve a list of all users, including their details and roles.
 //	@Tags			users
 //	@Produce		json
-//	@Success		200	{object}		models.UsersResponse		"List of users"
+//	@Success		200	{object}	models.UsersResponse	"List of users"
 //	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
 //	@Failure		404	{object}	models.ErrorResponse	"Not Found"
 //	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
@@ -136,7 +136,6 @@ func GetUserByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Description	Retrieve a user, including its details and roles.
 //	@Tags			users
 //	@Produce		json
-//	@Param			id	path		string								true	"User ID"
 //	@Success		200	{object}	models.SuccessResponseCreateUUID	"User details"
 //	@Failure		403	{object}	models.ErrorResponse				"Forbidden"
 //	@Failure		404	{object}	models.ErrorResponse				"Not Found"

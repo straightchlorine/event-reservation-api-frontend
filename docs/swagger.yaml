@@ -3,35 +3,45 @@ definitions:
   models.CreateEventRequest:
     properties:
       available_tickets:
+        example: 20000
         type: integer
       date:
+        example: "2024-12-31T20:00:00Z"
         type: string
       location:
         $ref: '#/definitions/models.CreateLocationRequest'
       name:
+        example: Champions League Final
         type: string
       price:
+        example: 99.99
         type: number
     type: object
   models.CreateLocationRequest:
     properties:
       address:
+        example: 123 Main St
         type: string
       capacity:
+        example: 50000
         type: integer
       country:
+        example: USA
         type: string
       stadium:
+        example: National Stadium
         type: string
     type: object
   models.CreateReservationPayload:
     properties:
       event_id:
+        example: 101
         type: integer
       tickets:
         items:
           properties:
             type:
+              example: STANDARD
               type: string
           type: object
         type: array
@@ -39,7 +49,7 @@ definitions:
   models.ErrorResponse:
     properties:
       message:
-        example: Error message
+        example: An error occurred
         type: string
     type: object
   models.EventResponse:
@@ -62,6 +72,13 @@ definitions:
         example: 99.99
         type: number
     type: object
+  models.EventsResponse:
+    properties:
+      events:
+        items:
+          $ref: '#/definitions/models.EventResponse'
+        type: array
+    type: object
   models.LocationResponse:
     properties:
       address:
@@ -80,19 +97,26 @@ definitions:
         example: Wembley Stadium
         type: string
     type: object
+  models.LocationsResponse:
+    properties:
+      locations:
+        items:
+          $ref: '#/definitions/models.LocationResponse'
+        type: array
+    type: object
   models.LoginRequest:
     properties:
       password:
-        example: root
+        example: securepassword
         type: string
       username:
-        example: root
+        example: user123
         type: string
     type: object
   models.LoginResponse:
     properties:
       exp:
-        example: 12313123
+        example: 1683649261
         type: integer
       token:
         example: jwt-token-string
@@ -103,26 +127,51 @@ definitions:
   models.ReservationResponse:
     properties:
       created_at:
+        example: "2024-12-01T15:30:00Z"
         type: string
       event:
         $ref: '#/definitions/models.EventResponse'
       id:
+        example: res123
         type: string
       status:
+        example: CONFIRMED
         type: string
       tickets:
         items:
           $ref: '#/definitions/models.TicketResponse'
         type: array
       total_tickets:
+        example: 5
         type: integer
       user:
+        example: johndoe
         type: string
+    type: object
+  models.ReservationTicketsResponse:
+    properties:
+      reservation_id:
+        example: res123
+        type: string
+      tickets:
+        items:
+          $ref: '#/definitions/models.TicketResponse'
+        type: array
+      user:
+        example: johndoe
+        type: string
+    type: object
+  models.ReservationsResponse:
+    properties:
+      reservations:
+        items:
+          $ref: '#/definitions/models.ReservationResponse'
+        type: array
     type: object
   models.SuccessResponse:
     properties:
       message:
-        example: Error message
+        example: Operation successful
         type: string
     type: object
   models.SuccessResponseCreate:
@@ -131,7 +180,7 @@ definitions:
         example: 1
         type: integer
       message:
-        example: Error message
+        example: Object created successfully
         type: string
     type: object
   models.SuccessResponseCreateUUID:
@@ -140,63 +189,114 @@ definitions:
         example: 123e4567-e89b-12d3-a456-426614174000
         type: string
       message:
-        example: Error message
+        example: Object created successfully
         type: string
     type: object
   models.TicketResponse:
     properties:
       id:
+        example: abc123
         type: string
       price:
+        example: 150
         type: number
       status:
+        example: available
         type: string
       type:
+        example: STANDARD
         type: string
     type: object
   models.UpdateEventRequest:
     properties:
       available_tickets:
+        example: 15000
         type: integer
       date:
+        example: "2024-12-25T18:00:00Z"
         type: string
       location:
         $ref: '#/definitions/models.UpdateLocationRequest'
       name:
+        example: Christmas Special
         type: string
       price:
+        example: 49.99
         type: number
     type: object
   models.UpdateLocationRequest:
     properties:
       address:
+        example: 456 Elm St
         type: string
       capacity:
+        example: 75000
         type: integer
       country:
+        example: Canada
         type: string
       stadium:
+        example: Maple Leaf Stadium
         type: string
     type: object
   models.UserResponse:
     properties:
       created_at:
+        example: "2024-01-01T10:00:00Z"
         type: string
       email:
+        example: johndoe@example.com
         type: string
       id:
+        example: 123e4567-e89b-12d3-a456-426614174000
         type: string
       is_active:
+        example: true
         type: boolean
       last_login:
+        example: "2024-12-01T15:30:00Z"
         type: string
       name:
+        example: John
         type: string
       role_id:
-        type: integer
+        example: admin
+        type: string
       surname:
+        example: Doe
         type: string
       username:
+        example: johndoe
+        type: string
+    type: object
+  models.UserTicketResponse:
+    properties:
+      event:
+        $ref: '#/definitions/models.EventResponse'
+      id:
+        example: ticket123
+        type: string
+      price:
+        example: 50
+        type: number
+      reservation_id:
+        example: res123
+        type: string
+      status:
+        example: SOLD
+        type: string
+      type:
+        example: STANDARD
+        type: string
+    type: object
+  models.UserTicketsResponse:
+    properties:
+      tickets:
+        items:
+          $ref: '#/definitions/models.UserTicketResponse'
+        type: array
+      user_id:
+        example: 123e4567-e89b-12d3-a456-426614174000
         type: string
     type: object
   models.UserUsernameID:
@@ -207,6 +307,13 @@ definitions:
       username:
         example: root
         type: string
+    type: object
+  models.UsersResponse:
+    properties:
+      users:
+        items:
+          $ref: '#/definitions/models.UserResponse'
+        type: array
     type: object
 host: localhost:8080
 info:
@@ -225,9 +332,7 @@ paths:
         "200":
           description: List of events
           schema:
-            items:
-              $ref: '#/definitions/models.EventResponse'
-            type: array
+            $ref: '#/definitions/models.EventsResponse'
         "404":
           description: Not Found
           schema:
@@ -381,9 +486,7 @@ paths:
         "200":
           description: List of locations
           schema:
-            items:
-              $ref: '#/definitions/models.LocationResponse'
-            type: array
+            $ref: '#/definitions/models.LocationsResponse'
         "404":
           description: Not Found
           schema:
@@ -596,9 +699,7 @@ paths:
         "200":
           description: List of reservations
           schema:
-            items:
-              $ref: '#/definitions/models.ReservationResponse'
-            type: array
+            $ref: '#/definitions/models.ReservationsResponse'
         "403":
           description: Forbidden
           schema:
@@ -647,119 +748,17 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Create a reservation (registered/admin only)
+      summary: Create a reservation (owner/admin only)
       tags:
       - reservations
-  /reservations/{id}/tickets:
-    get:
-      description: Retrieve all tickets associated with a specific reservation by
-        its ID.
-      parameters:
-      - description: Reservation ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: List of tickets for the reservation
-          schema:
-            items:
-              $ref: '#/definitions/models.TicketResponse'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: List tickets for a reservation
-      tags:
-      - reservatons
-  /reservations/user:
-    get:
-      description: Retrieve a list of current user's reservations along with  details
-        and tickets they reserve.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: List of reservations for the user
-          schema:
-            items:
-              $ref: '#/definitions/models.ReservationResponse'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: List user reservations
-      tags:
-      - reservations
-  /reservations/user/{id}:
-    get:
-      description: Retrieve a list of all reservations made by a specific user, including
-        their details and tickets they reserve.
-      parameters:
-      - description: User ID
-        in: query
-        name: user_id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: List of reservations for the user
-          schema:
-            items:
-              $ref: '#/definitions/models.ReservationResponse'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: List user reservations (admin only)
-      tags:
-      - reservations
-  /reservations{id}:
-    get:
+  /reservations/{id}:
+    delete:
       description: Delete a single reservation along with its tickets from the database.
       produces:
       - application/json
       responses:
         "200":
-          description: Reservation details
+          description: Reservation deleted successfully
           schema:
             $ref: '#/definitions/models.SuccessResponse'
         "403":
@@ -779,6 +778,228 @@ paths:
       summary: Delete a reservation by ID (admin only)
       tags:
       - reservations
+    get:
+      description: Retrieve a single reservation, including their details and tickets
+        they reserve.
+      parameters:
+      - description: Reservation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Reservation details
+          schema:
+            $ref: '#/definitions/models.ReservationResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a reservation by ID (admin/owner only)
+      tags:
+      - reservations
+  /reservations/{id}/cancel:
+    post:
+      description: Set statuses of reservation and its tickets to cancelled.
+      parameters:
+      - description: Reservation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Reservation canceled successfully
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cancel a reservation (owner/admin only)
+      tags:
+      - reservations
+  /reservations/{id}/tickets:
+    get:
+      description: Retrieve all tickets associated with a specific reservation by
+        its ID.
+      parameters:
+      - description: Reservation ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of tickets for the reservation
+          schema:
+            $ref: '#/definitions/models.ReservationTicketsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List tickets for a reservation (owner/admin only)
+      tags:
+      - reservations
+  /reservations/user:
+    get:
+      description: Retrieve a list of current user's reservations along with details
+        and tickets they reserve.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of reservations for the user
+          schema:
+            $ref: '#/definitions/models.ReservationsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List user reservations for currently logged in user
+      tags:
+      - reservations
+  /reservations/user/{id}:
+    get:
+      description: Retrieve a list of all reservations made by a specific user, including
+        their details and tickets they reserve.
+      parameters:
+      - description: User ID
+        in: query
+        name: user_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of reservations for the user
+          schema:
+            $ref: '#/definitions/models.ReservationsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List user reservations (admin/owner only)
+      tags:
+      - reservations
+  /reservations/user/{id}/tickets:
+    get:
+      description: Retrieve a list of user's tickets.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of tickets belonging to the user
+          schema:
+            $ref: '#/definitions/models.UserTicketsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List user tickets (admin/owner only)
+      tags:
+      - reservations
+  /reservations/user/tickets:
+    get:
+      description: Retrieve a list of current user's tickets.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of tickets belonging to the user
+          schema:
+            $ref: '#/definitions/models.UserTicketsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List user tickets for currently logged in user
+      tags:
+      - reservations
   /users:
     get:
       description: Retrieve a list of all users, including their details and roles.
@@ -788,9 +1009,7 @@ paths:
         "200":
           description: List of users
           schema:
-            items:
-              $ref: '#/definitions/models.UserResponse'
-            type: array
+            $ref: '#/definitions/models.UsersResponse'
         "403":
           description: Forbidden
           schema:
@@ -810,12 +1029,6 @@ paths:
       - users
     put:
       description: Retrieve a user, including its details and roles.
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: string
       produces:
       - application/json
       responses:
@@ -913,7 +1126,7 @@ paths:
         type: string
       responses:
         "200":
-          description: User details
+          description: User updated successfully
           schema:
             $ref: '#/definitions/models.SuccessResponse'
         "403":

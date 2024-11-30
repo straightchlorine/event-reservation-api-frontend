@@ -16,7 +16,7 @@ import (
 //	@Description	Retrieve a list of all reservations, including their details and tickets they reserve.
 //	@Tags			reservations
 //	@Produce		json
-//	@Success		200	{object}		models.ReservationsResponse	"List of reservations"
+//	@Success		200	{object}	models.ReservationsResponse	"List of reservations"
 //	@Failure		403	{object}	models.ErrorResponse		"Forbidden"
 //	@Failure		404	{object}	models.ErrorResponse		"Not Found"
 //	@Failure		500	{object}	models.ErrorResponse		"Internal Server Error"
@@ -91,7 +91,7 @@ func GetReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			res.Tickets = tickets
 			reservations = append(reservations, res)
 		}
-		reservations_response := models.ReservationsRespones{Reservations: reservations}
+		reservations_response := models.ReservationsResponse{Reservations: reservations}
 		writeJSONResponse(w, http.StatusOK, reservations_response)
 	}
 }
@@ -102,6 +102,7 @@ func GetReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Description	Retrieve a single reservation, including their details and tickets they reserve.
 //	@Tags			reservations
 //	@Produce		json
+//	@Param			id	path		string						true	"Reservation ID"
 //	@Success		200	{object}	models.ReservationResponse	"Reservation details"
 //	@Failure		403	{object}	models.ErrorResponse		"Forbidden"
 //	@Failure		404	{object}	models.ErrorResponse		"Not Found"
@@ -181,11 +182,11 @@ func GetReservationByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // GetCurrentUserReservationsHandler lists all reservations for currently logged in user.
 //
-//	@Summary		List user reservations
-//	@Description	Retrieve a list of current user's reservations along with  details and tickets they reserve.
+//	@Summary		List user reservations for currently logged in user
+//	@Description	Retrieve a list of current user's reservations along with details and tickets they reserve.
 //	@Tags			reservations
 //	@Produce		json
-//	@Success		200	{object}		models.ReservationsResponse	"List of reservations for the user"
+//	@Success		200	{object}	models.ReservationsResponse	"List of reservations for the user"
 //	@Failure		400	{object}	models.ErrorResponse		"Bad Request"
 //	@Failure		404	{object}	models.ErrorResponse		"Not Found"
 //	@Failure		500	{object}	models.ErrorResponse		"Internal Server Error"
@@ -201,6 +202,11 @@ func GetCurrentUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				http.StatusInternalServerError,
 				"Failed to fetch the user id.",
 			)
+			return
+		}
+
+		if !isOverUnregistered(r) {
+			writeErrorResponse(w, http.StatusForbidden, "Insufficient permissions.")
 			return
 		}
 
@@ -284,6 +290,103 @@ func GetCurrentUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+// GetCurrentUserReservationsTicketsHandler lists all tickets for currently logged in user.
+//
+//	@Summary		List user tickets for currently logged in user
+//	@Description	Retrieve a list of current user's tickets.
+//	@Tags			reservations
+//	@Produce		json
+//	@Param			id	path		string						true	"User ID"
+//	@Success		200	{object}	models.UserTicketsResponse	"List of tickets belonging to the user"
+//	@Failure		400	{object}	models.ErrorResponse		"Bad Request"
+//	@Failure		404	{object}	models.ErrorResponse		"Not Found"
+//	@Failure		500	{object}	models.ErrorResponse		"Internal Server Error"
+//	@Security		BearerAuth
+//	@Router			/reservations/user/tickets [get]
+func GetCurrentUserReservationsTicketsHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// get the user ID out of context
+		userID, err := getUserIdFromContext(r.Context())
+		if err != nil {
+			writeErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				"Failed to fetch the user id.",
+			)
+			return
+		}
+
+		if !isOverUnregistered(r) {
+			writeErrorResponse(w, http.StatusForbidden, "Insufficient permissions.")
+			return
+		}
+
+		// fetch all tickets user has bought
+		query := `
+			SELECT
+				t.id, t.reservation_id, t.price,
+				tt.name, ts.name,
+				e.id, e.name, e.date,
+				l.country, l.address, l.stadium
+			FROM tickets t
+			JOIN ticket_types tt ON t.type_id = tt.id
+			JOIN ticket_statuses ts ON t.status_id = ts.id
+			JOIN reservations r ON t.reservation_id = r.id
+			JOIN events e ON r.event_id = e.id
+			JOIN locations l ON e.location_id = l.id
+			WHERE r.user_id = $1
+		`
+		rows, err := pool.Query(r.Context(), query, userID)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				writeErrorResponse(w, http.StatusNotFound, "No tickets found for the user.")
+			}
+			writeErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				"Failed to fetch tickets.",
+			)
+			return
+		}
+		defer rows.Close()
+
+		// build the response data
+		tickets := []models.UserTicketResponse{}
+		for rows.Next() {
+			var ticket models.UserTicketResponse
+			var location models.LocationResponse
+			var event models.EventResponse
+
+			if err := rows.Scan(
+				&ticket.ID, &ticket.ReservationID, &ticket.Price, &ticket.Type, &ticket.Status,
+				&event.ID, &event.Name, &event.Date,
+				&location.Country, &location.Address, &location.Stadium,
+			); err != nil {
+				writeErrorResponse(
+					w,
+					http.StatusInternalServerError,
+					"Failed to parse the tickets.",
+				)
+				return
+			}
+
+			// append the structs to the response
+			event.Location = location
+			ticket.Event = event
+
+			tickets = append(tickets, ticket)
+		}
+
+		if len(tickets) == 0 {
+			writeErrorResponse(w, http.StatusNotFound, "No tickets found for the user.")
+			return
+		}
+
+		tickets_respone := models.UserTicketsResponse{UserID: userID, Tickets: tickets}
+		writeJSONResponse(w, http.StatusOK, tickets_respone)
+	}
+}
+
 // GetUserReservationsHandler returns all reservations for a specific user.
 //
 //	@Summary		List user reservations (admin/owner only)
@@ -291,7 +394,7 @@ func GetCurrentUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Tags			reservations
 //	@Produce		json
 //	@Param			user_id	query		int							true	"User ID"
-//	@Success		200		{object}		models.ReservationsResponse	"List of reservations for the user"
+//	@Success		200		{object}	models.ReservationsResponse	"List of reservations for the user"
 //	@Failure		400		{object}	models.ErrorResponse		"Bad Request"
 //	@Failure		404		{object}	models.ErrorResponse		"Not Found"
 //	@Failure		500		{object}	models.ErrorResponse		"Internal Server Error"
@@ -385,8 +488,106 @@ func GetUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		reservations_response := models.ReservationsRespones{Reservations: reservations}
+		reservations_response := models.ReservationsResponse{Reservations: reservations}
 		writeJSONResponse(w, http.StatusOK, reservations_response)
+	}
+}
+
+// GetUserReservationsTicketsHandler returns all tickets for a specific user.
+//
+//	@Summary		List user tickets (admin/owner only)
+//	@Description	Retrieve a list of user's tickets.
+//	@Tags			reservations
+//	@Produce		json
+//	@Param			id	path		string					true	"User ID"
+//	@Success		200	{object}	models.UserTicketsResponse	"List of tickets belonging to the user"
+//	@Failure		400	{object}	models.ErrorResponse		"Bad Request"
+//	@Failure		404	{object}	models.ErrorResponse		"Not Found"
+//	@Failure		500	{object}	models.ErrorResponse		"Internal Server Error"
+//	@Security		BearerAuth
+//	@Router			/reservations/user/{id}/tickets [get]
+func GetUserReservationsTicketsHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// get the user id
+		userID, err := getUserIdFromContext(r.Context())
+		if err != nil {
+			writeErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				"Failed to fetch the user identifier.",
+			)
+			return
+		}
+
+		// permissions
+		if !isAdmin(r) && !isOwner(r, userID) {
+			writeErrorResponse(w, http.StatusForbidden, "Insufficient permissions.")
+			return
+		}
+
+		// fetch all tickets user has bought
+		query := `
+			SELECT
+				t.id, t.reservation_id, t.price,
+				tt.name, ts.name,
+				e.id, e.name, e.date,
+				l.country, l.address, l.stadium
+			FROM tickets t
+			JOIN ticket_types tt ON t.type_id = tt.id
+			JOIN ticket_statuses ts ON t.status_id = ts.id
+			JOIN reservations r ON t.reservation_id = r.id
+			JOIN events e ON r.event_id = e.id
+			JOIN locations l ON e.location_id = l.id
+			WHERE r.user_id = $1
+		`
+		rows, err := pool.Query(r.Context(), query, userID)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				writeErrorResponse(w, http.StatusNotFound, "No tickets found for the user.")
+			}
+			writeErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				"Failed to fetch tickets.",
+			)
+			return
+		}
+		defer rows.Close()
+
+		// build the response data
+		tickets := []models.UserTicketResponse{}
+		for rows.Next() {
+			var ticket models.UserTicketResponse
+			var location models.LocationResponse
+			var event models.EventResponse
+
+			if err := rows.Scan(
+				&ticket.ID, &ticket.ReservationID, &ticket.Price, &ticket.Type, &ticket.Status,
+				&event.ID, &event.Name, &event.Date,
+				&location.Country, &location.Address, &location.Stadium,
+			); err != nil {
+				writeErrorResponse(
+					w,
+					http.StatusInternalServerError,
+					"Failed to parse the tickets.",
+				)
+				return
+			}
+
+			// append the structs to the response
+			event.Location = location
+			ticket.Event = event
+
+			tickets = append(tickets, ticket)
+		}
+
+		if len(tickets) == 0 {
+			writeErrorResponse(w, http.StatusNotFound, "No tickets found for the user.")
+			return
+		}
+
+		tickets_respone := models.UserTicketsResponse{UserID: userID, Tickets: tickets}
+		writeJSONResponse(w, http.StatusOK, tickets_respone)
 	}
 }
 
@@ -394,13 +595,13 @@ func GetUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //
 //	@Summary		List tickets for a reservation (owner/admin only)
 //	@Description	Retrieve all tickets associated with a specific reservation by its ID.
-//	@Tags			reservatons
+//	@Tags			reservations
 //	@Produce		json
-//	@Param			id	path		int						true	"Reservation ID"
-//	@Success		200	{object}		models.TicketsResponse	"List of tickets for the reservation"
-//	@Failure		400	{object}	models.ErrorResponse	"Bad Request"
-//	@Failure		404	{object}	models.ErrorResponse	"Not Found"
-//	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
+//	@Param			id	path		int									true	"Reservation ID"
+//	@Success		200	{object}	models.ReservationTicketsResponse	"List of tickets for the reservation"
+//	@Failure		400	{object}	models.ErrorResponse				"Bad Request"
+//	@Failure		404	{object}	models.ErrorResponse				"Not Found"
+//	@Failure		500	{object}	models.ErrorResponse				"Internal Server Error"
 //	@Security		BearerAuth
 //	@Router			/reservations/{id}/tickets [get]
 func GetReservationTicketsHandler(pool *pgxpool.Pool) http.HandlerFunc {
@@ -602,7 +803,7 @@ func CreateReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		err = substractTicketsFromEvent(r.Context(), tx, req.EventID, req.TotalTickets)
+		err = setAvailableTickets(r.Context(), tx, req.EventID, req.TotalTickets)
 		if err != nil {
 			writeErrorResponse(w, http.StatusInternalServerError, err.Error())
 		}
@@ -694,18 +895,99 @@ func CreateReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+// CancelReservationHandler updates the status of the reservation and its tickets to CANCELLED.
+//
+//	@Summary		Cancel a reservation (owner/admin only)
+//	@Description	Set statuses of reservation and its tickets to cancelled.
+//	@Tags			reservations
+//	@Produce		json
+//	@Param			id	path		string					true	"Reservation ID"
+//	@Success		200	{object}	models.SuccessResponse	"Reservation canceled successfully"
+//	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
+//	@Failure		404	{object}	models.ErrorResponse	"Not Found"
+//	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
+//	@Security		BearerAuth
+//	@Router			/reservations/{id}/cancel [post]
+func CancelReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// get the user id
+		userId, err := getUserIdFromContext(r.Context())
+		if err != nil {
+			writeErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				"Failed to fetch the user identifier.",
+			)
+			return
+		}
+
+		// permissions
+		if !isAdmin(r) && !isOwner(r, userId) {
+			writeErrorResponse(w, http.StatusForbidden, "Insufficient permissions.")
+			return
+		}
+
+		reservationId, err := parseReservationIdFromURL(r)
+		if err != nil {
+			writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		}
+
+		// start a transaction
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			writeErrorResponse(w, http.StatusInternalServerError, "Failed to start transaction.")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		if err := updateTicketsStatus(r.Context(), tx, reservationId, "CANCELLED"); err != nil {
+			writeErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				"Failed to cancel the tickets.",
+			)
+			return
+		}
+
+		if err := updateReservationStatus(r.Context(), tx, reservationId, "CANCELLED"); err != nil {
+			writeErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				"Failed to cancel the reservation.",
+			)
+			return
+		}
+
+		if err = tx.Commit(r.Context()); err != nil {
+			writeErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				"Failed to commit the transaction.",
+			)
+			return
+		}
+
+		writeJSONResponse(
+			w,
+			http.StatusOK,
+			models.SuccessResponse{Message: "Reservation canceled successfully."},
+		)
+	}
+}
+
 // DeleteReservationHandler deletes a single reservation along with its tickets.
 //
 //	@Summary		Delete a reservation by ID (admin only)
 //	@Description	Delete a single reservation along with its tickets from the database.
 //	@Tags			reservations
 //	@Produce		json
-//	@Success		200	{object}	models.SuccessResponse	"Reservation details"
+//	@Param			id	path		string					true	"Reservation ID"
+//	@Success		200	{object}	models.SuccessResponse	"Reservation deleted successfully"
 //	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
 //	@Failure		404	{object}	models.ErrorResponse	"Not Found"
 //	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
 //	@Security		BearerAuth
-//	@Router			/reservations{id} [get]
+//	@Router			/reservations/{id} [delete]
 func DeleteReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !isAdmin(r) {
