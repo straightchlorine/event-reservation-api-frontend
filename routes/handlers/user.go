@@ -19,7 +19,7 @@ import (
 //	@Description	Retrieve a list of all users, including their details and roles.
 //	@Tags			users
 //	@Produce		json
-//	@Success		200	{array}		models.UserResponse		"List of users"
+//	@Success		200	{object}		models.UsersResponse		"List of users"
 //	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
 //	@Failure		404	{object}	models.ErrorResponse	"Not Found"
 //	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"

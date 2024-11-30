@@ -20,7 +20,7 @@ import (
 //	@ID				api.getEvents
 //	@Tags			events
 //	@Produce		json
-//	@Success		200	{array}	models.EventResponse	"List of events"
+//	@Success		200	{object}		models.EventsResponse	"List of events"
 //	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
 //	@Failure		404	{object}	models.ErrorResponse	"Not Found"
 //	@Router			/events [get]
@@ -73,7 +73,8 @@ func GetEventsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			event.Location = location
 			events = append(events, event)
 		}
-		writeJSONResponse(w, http.StatusOK, events)
+		events_response := models.EventsResponse{Events: events}
+		writeJSONResponse(w, http.StatusOK, events_response)
 	}
 }
 
@@ -149,7 +150,7 @@ func GetEventByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Param			body	body		models.CreateEventRequest		true	"Payload to create an event"
 //	@Success		200		{object}	models.SuccessResponseCreate	"Event created successfully"
 //	@Failure		400		{object}	models.ErrorResponse			"Bad Request"
-//	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
+//	@Failure		403		{object}	models.ErrorResponse			"Forbidden"
 //	@Failure		500		{object}	models.ErrorResponse			"Internal Server Error"
 //	@Router			/events [put]
 func CreateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
@@ -255,7 +256,7 @@ func CreateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Param			body	body		models.UpdateEventRequest	true	"Payload to update an event"
 //	@Success		200		{object}	models.SuccessResponse		"Event updated successfully"
 //	@Failure		400		{object}	models.ErrorResponse		"Bad Request"
-//	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
+//	@Failure		403		{object}	models.ErrorResponse		"Forbidden"
 //	@Failure		422		{object}	models.ErrorResponse		"Unprocessable Entity"
 //	@Failure		500		{object}	models.ErrorResponse		"Internal Server Error"
 //	@Router			/events/{id} [put]

@@ -12,14 +12,6 @@ type BlacklistEntry struct {
 	ExpiresAt time.Time
 }
 
-// Ticket, as its returned to user
-type TicketResponse struct {
-	ID     string  `json:"id"`
-	Type   string  `json:"type"`
-	Price  float64 `json:"price"`
-	Status string  `json:"status"`
-}
-
 type LocationUpdatePayload struct {
 	Stadium  *string `json:"stadium,omitempty"`
 	Address  *string `json:"address,omitempty"`

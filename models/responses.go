@@ -51,6 +51,10 @@ type EventResponse struct {
 	Location         LocationResponse `json:"location"`
 }
 
+type EventsResponse struct {
+	Events []EventResponse `json:"events"`
+}
+
 // Location, as it is returned to the user.
 type LocationResponse struct {
 	ID       int    `json:"id"       example:"101"`
@@ -58,6 +62,10 @@ type LocationResponse struct {
 	Address  string `json:"address"  example:"Wembley Park, London"`
 	Stadium  string `json:"stadium"  example:"Wembley Stadium"`
 	Capacity int    `json:"capacity" example:"90000"`
+}
+
+type LocationsResponse struct {
+	Locations []LocationResponse `json:"locations"`
 }
 
 // UserResponse, as it is returned to the user.

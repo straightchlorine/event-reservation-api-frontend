@@ -20,7 +20,7 @@ import (
 //	@ID				api.getLocations
 //	@Tags			locations
 //	@Produce		json
-//	@Success		200	{array}		models.LocationResponse	"List of locations"
+//	@Success		200	{object}		models.LocationsResponse	"List of locations"
 //	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
 //	@Failure		404	{object}	models.ErrorResponse	"Not Found"
 //	@Router			/locations [get]
@@ -70,8 +70,8 @@ func GetLocationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			locations = append(locations, location)
 		}
-
-		writeJSONResponse(w, http.StatusOK, locations)
+		locations_response := models.LocationsResponse{Locations: locations}
+		writeJSONResponse(w, http.StatusOK, locations_response)
 	}
 }
 
@@ -83,7 +83,7 @@ func GetLocationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Tags			locations
 //	@Produce		json
 //	@Param			id	path		string					true	"Location ID"
-//	@Success		200	{object}		models.LocationResponse	"Location details"
+//	@Success		200	{object}	models.LocationResponse	"Location details"
 //	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
 //	@Failure		404	{object}	models.ErrorResponse	"Not Found"
 //	@Router			/locations/{id} [get]
@@ -131,10 +131,10 @@ func GetLocationByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Tags			locations
 //	@Produce		json
 //	@Accept			json
-//	@Param			body	body		models.CreateLocationRequest		true	"Payload to create a location"
+//	@Param			body	body		models.CreateLocationRequest	true	"Payload to create a location"
 //	@Success		200		{object}	models.SuccessResponseCreate	"Location created successfully"
 //	@Failure		400		{object}	models.ErrorResponse			"Bad Request"
-//	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
+//	@Failure		403		{object}	models.ErrorResponse			"Forbidden"
 //	@Failure		500		{object}	models.ErrorResponse			"Internal Server Error"
 //	@Router			/locations [put]
 func CreateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
@@ -204,13 +204,13 @@ func CreateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Tags			locations
 //	@Produce		json
 //	@Accept			json
-//	@Param			id		path		string						true	"Location ID"
+//	@Param			id		path		string							true	"Location ID"
 //	@Param			body	body		models.UpdateLocationRequest	true	"Payload to update a location"
-//	@Success		200		{object}	models.SuccessResponse		"Event updated successfully"
-//	@Failure		400		{object}	models.ErrorResponse		"Bad Request"
-//	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
-//	@Failure		422		{object}	models.ErrorResponse		"Unprocessable Entity"
-//	@Failure		500		{object}	models.ErrorResponse		"Internal Server Error"
+//	@Success		200		{object}	models.SuccessResponse			"Event updated successfully"
+//	@Failure		400		{object}	models.ErrorResponse			"Bad Request"
+//	@Failure		403		{object}	models.ErrorResponse			"Forbidden"
+//	@Failure		422		{object}	models.ErrorResponse			"Unprocessable Entity"
+//	@Failure		500		{object}	models.ErrorResponse			"Internal Server Error"
 //	@Router			/locations/{id} [put]
 func UpdateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -287,7 +287,7 @@ func UpdateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-// DeleteEventHandler deletes an existing location by ID.
+// DeleteLocationHandler deletes an existing location by ID.
 //
 //	@Summary		Delete an existing location
 //	@Description	Delete a location by its ID.

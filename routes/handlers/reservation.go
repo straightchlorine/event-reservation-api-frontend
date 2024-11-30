@@ -16,7 +16,7 @@ import (
 //	@Description	Retrieve a list of all reservations, including their details and tickets they reserve.
 //	@Tags			reservations
 //	@Produce		json
-//	@Success		200	{array}		models.ReservationsResponse	"List of reservations"
+//	@Success		200	{object}		models.ReservationsResponse	"List of reservations"
 //	@Failure		403	{object}	models.ErrorResponse		"Forbidden"
 //	@Failure		404	{object}	models.ErrorResponse		"Not Found"
 //	@Failure		500	{object}	models.ErrorResponse		"Internal Server Error"
@@ -185,7 +185,7 @@ func GetReservationByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Description	Retrieve a list of current user's reservations along with  details and tickets they reserve.
 //	@Tags			reservations
 //	@Produce		json
-//	@Success		200	{array}		models.ReservationsResponse	"List of reservations for the user"
+//	@Success		200	{object}		models.ReservationsResponse	"List of reservations for the user"
 //	@Failure		400	{object}	models.ErrorResponse		"Bad Request"
 //	@Failure		404	{object}	models.ErrorResponse		"Not Found"
 //	@Failure		500	{object}	models.ErrorResponse		"Internal Server Error"
@@ -291,7 +291,7 @@ func GetCurrentUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Tags			reservations
 //	@Produce		json
 //	@Param			user_id	query		int							true	"User ID"
-//	@Success		200		{array}		models.ReservationsResponse	"List of reservations for the user"
+//	@Success		200		{object}		models.ReservationsResponse	"List of reservations for the user"
 //	@Failure		400		{object}	models.ErrorResponse		"Bad Request"
 //	@Failure		404		{object}	models.ErrorResponse		"Not Found"
 //	@Failure		500		{object}	models.ErrorResponse		"Internal Server Error"
@@ -397,7 +397,7 @@ func GetUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Tags			reservatons
 //	@Produce		json
 //	@Param			id	path		int						true	"Reservation ID"
-//	@Success		200	{array}		models.TicketResponse	"List of tickets for the reservation"
+//	@Success		200	{object}		models.TicketsResponse	"List of tickets for the reservation"
 //	@Failure		400	{object}	models.ErrorResponse	"Bad Request"
 //	@Failure		404	{object}	models.ErrorResponse	"Not Found"
 //	@Failure		500	{object}	models.ErrorResponse	"Internal Server Error"
