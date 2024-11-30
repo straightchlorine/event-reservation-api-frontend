@@ -141,7 +141,7 @@ func GetEventByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // CreateEventHandler creates a single event in the database.
 //
-//	@Summary		Create a new event.
+//	@Summary		Create a new event (admin only).
 //	@Description	Parse the payload and create a new event with provided dataset.
 //	@ID				api.createEvent
 //	@Tags			events
@@ -152,6 +152,7 @@ func GetEventByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Failure		400		{object}	models.ErrorResponse			"Bad Request"
 //	@Failure		403		{object}	models.ErrorResponse			"Forbidden"
 //	@Failure		500		{object}	models.ErrorResponse			"Internal Server Error"
+//	@Security		BearerAuth
 //	@Router			/events [put]
 func CreateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -246,7 +247,7 @@ func CreateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // UpdateEventHandler updates an existing event by ID.
 //
-//	@Summary		Update an existing event
+//	@Summary		Update an existing event (admin only).
 //	@Description	Update event details based on the provided payload.
 //	@ID				api.updateEvent
 //	@Tags			events
@@ -259,6 +260,7 @@ func CreateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Failure		403		{object}	models.ErrorResponse		"Forbidden"
 //	@Failure		422		{object}	models.ErrorResponse		"Unprocessable Entity"
 //	@Failure		500		{object}	models.ErrorResponse		"Internal Server Error"
+//	@Security		BearerAuth
 //	@Router			/events/{id} [put]
 func UpdateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -379,7 +381,7 @@ func UpdateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // DeleteEventHandler deletes an existing event by ID.
 //
-//	@Summary		Delete an existing event
+//	@Summary		Delete an existing event (admin only).
 //	@Description	Delete event by its ID.
 //	@ID				api.deleteEvent
 //	@Tags			events
@@ -388,6 +390,7 @@ func UpdateEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Success		200	{object}	models.SuccessResponseCreate	"Event deleted successfully"
 //	@Failure		400	{object}	models.ErrorResponse			"Bad Request"
 //	@Failure		500	{object}	models.ErrorResponse			"Internal Server Error"
+//	@Security		BearerAuth
 //	@Router			/events/{id} [delete]
 func DeleteEventHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

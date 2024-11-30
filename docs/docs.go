@@ -48,6 +48,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Parse the payload and create a new event with provided dataset.",
                 "consumes": [
                     "application/json"
@@ -58,7 +63,7 @@ const docTemplate = `{
                 "tags": [
                     "events"
                 ],
-                "summary": "Create a new event.",
+                "summary": "Create a new event (admin only).",
                 "operationId": "api.createEvent",
                 "parameters": [
                     {
@@ -141,6 +146,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Update event details based on the provided payload.",
                 "consumes": [
                     "application/json"
@@ -151,7 +161,7 @@ const docTemplate = `{
                 "tags": [
                     "events"
                 ],
-                "summary": "Update an existing event",
+                "summary": "Update an existing event (admin only).",
                 "operationId": "api.updateEvent",
                 "parameters": [
                     {
@@ -205,6 +215,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Delete event by its ID.",
                 "produces": [
                     "application/json"
@@ -212,7 +227,7 @@ const docTemplate = `{
                 "tags": [
                     "events"
                 ],
-                "summary": "Delete an existing event",
+                "summary": "Delete an existing event (admin only).",
                 "operationId": "api.deleteEvent",
                 "parameters": [
                     {
@@ -254,7 +269,7 @@ const docTemplate = `{
                 "tags": [
                     "locations"
                 ],
-                "summary": "Get all locations",
+                "summary": "Get all locations.",
                 "operationId": "api.getLocations",
                 "responses": {
                     "200": {
@@ -278,6 +293,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Parse the payload and create a new location with provided dataset.",
                 "consumes": [
                     "application/json"
@@ -288,7 +308,7 @@ const docTemplate = `{
                 "tags": [
                     "locations"
                 ],
-                "summary": "Create a new location.",
+                "summary": "Create a new location (admin only).",
                 "operationId": "api.createLocation",
                 "parameters": [
                     {
@@ -339,7 +359,7 @@ const docTemplate = `{
                     "locations"
                 ],
                 "summary": "Retrieve a location.",
-                "operationId": "api.getLocation",
+                "operationId": "api.getLocationByID",
                 "parameters": [
                     {
                         "type": "string",
@@ -371,6 +391,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Update location details based on the provided payload.",
                 "consumes": [
                     "application/json"
@@ -381,7 +406,7 @@ const docTemplate = `{
                 "tags": [
                     "locations"
                 ],
-                "summary": "Update an existing location",
+                "summary": "Update an existing location (admin only).",
                 "operationId": "api.updateLocation",
                 "parameters": [
                     {
@@ -435,6 +460,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Delete a location by its ID.",
                 "produces": [
                     "application/json"
@@ -442,7 +472,7 @@ const docTemplate = `{
                 "tags": [
                     "locations"
                 ],
-                "summary": "Delete an existing location",
+                "summary": "Delete an existing location (admin only).",
                 "operationId": "api.deleteLocation",
                 "parameters": [
                     {
@@ -580,7 +610,8 @@ const docTemplate = `{
                 "tags": [
                     "reservations"
                 ],
-                "summary": "List all reservations (admin only)",
+                "summary": "List all reservations (admin only).",
+                "operationId": "api.getReservations",
                 "responses": {
                     "200": {
                         "description": "List of reservations",
@@ -621,7 +652,8 @@ const docTemplate = `{
                 "tags": [
                     "reservations"
                 ],
-                "summary": "Create a reservation (owner/admin only)",
+                "summary": "Create a reservation (owner/admin only).",
+                "operationId": "api.createReservation",
                 "parameters": [
                     {
                         "description": "Payload to create a reservation",
@@ -675,7 +707,8 @@ const docTemplate = `{
                 "tags": [
                     "reservations"
                 ],
-                "summary": "List user reservations for currently logged in user",
+                "summary": "List user reservations for currently logged in user.",
+                "operationId": "api.getReservationsForCurrentUser",
                 "responses": {
                     "200": {
                         "description": "List of reservations for the user",
@@ -718,7 +751,8 @@ const docTemplate = `{
                 "tags": [
                     "reservations"
                 ],
-                "summary": "List user tickets for currently logged in user",
+                "summary": "List user tickets for currently logged in user.",
+                "operationId": "api.getReservationTicketsForCurrentUser",
                 "parameters": [
                     {
                         "type": "string",
@@ -771,6 +805,7 @@ const docTemplate = `{
                     "reservations"
                 ],
                 "summary": "List user reservations (admin/owner only)",
+                "operationId": "api.getReservationsForUserByID",
                 "parameters": [
                     {
                         "type": "integer",
@@ -822,7 +857,17 @@ const docTemplate = `{
                 "tags": [
                     "reservations"
                 ],
-                "summary": "List user tickets (admin/owner only)",
+                "summary": "List user tickets (admin/owner only).",
+                "operationId": "api.getReservationTicketsForUserByID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "List of tickets belonging to the user",
@@ -865,7 +910,8 @@ const docTemplate = `{
                 "tags": [
                     "reservations"
                 ],
-                "summary": "Get a reservation by ID (admin/owner only)",
+                "summary": "Get a reservation by ID (admin/owner only).",
+                "operationId": "api.getReservationsByID",
                 "parameters": [
                     {
                         "type": "string",
@@ -915,7 +961,17 @@ const docTemplate = `{
                 "tags": [
                     "reservations"
                 ],
-                "summary": "Delete a reservation by ID (admin only)",
+                "summary": "Delete a reservation by ID (admin only).",
+                "operationId": "api.deleteReservation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Reservation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Reservation deleted successfully",
@@ -958,7 +1014,8 @@ const docTemplate = `{
                 "tags": [
                     "reservations"
                 ],
-                "summary": "Cancel a reservation (owner/admin only)",
+                "summary": "Cancel a reservation (owner/admin only).",
+                "operationId": "api.cancelReservation",
                 "parameters": [
                     {
                         "type": "string",
@@ -1010,7 +1067,8 @@ const docTemplate = `{
                 "tags": [
                     "reservations"
                 ],
-                "summary": "List tickets for a reservation (owner/admin only)",
+                "summary": "List tickets attributed to given reservation (owner/admin only).",
+                "operationId": "api.getReservationTicketsByID",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1062,7 +1120,8 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "List all users (admin only)",
+                "summary": "List all users (admin only).",
+                "operationId": "api.getUsers",
                 "responses": {
                     "200": {
                         "description": "List of users",
@@ -1096,14 +1155,15 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retrieve a user, including its details and roles.",
+                "description": "Create a user with registered role based on provided payload. Request to create an admin user made by user without already admin status will be rejected.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "users"
                 ],
-                "summary": "Create a new user.",
+                "summary": "Create a new user (open to create a user with registered role).",
+                "operationId": "api.createUser",
                 "responses": {
                     "200": {
                         "description": "User details",
@@ -1146,7 +1206,8 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Get a user by ID (admin only)",
+                "summary": "Get a user by ID (admin only).",
+                "operationId": "api.getUsersByID",
                 "parameters": [
                     {
                         "type": "string",
@@ -1194,6 +1255,7 @@ const docTemplate = `{
                     "users"
                 ],
                 "summary": "Update user.",
+                "operationId": "api.updateUser",
                 "parameters": [
                     {
                         "type": "string",
@@ -1236,11 +1298,11 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Deletes user from the database (only owner/admin).",
+                "description": "Deletes user from the database.",
                 "tags": [
                     "users"
                 ],
-                "summary": "Delete user.",
+                "summary": "Delete user (admin/owner only).",
                 "parameters": [
                     {
                         "type": "string",

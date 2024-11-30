@@ -12,9 +12,10 @@ import (
 
 // GetReservationHandler lists all reservations.
 //
-//	@Summary		List all reservations (admin only)
+//	@Summary		List all reservations (admin only).
 //	@Description	Retrieve a list of all reservations, including their details and tickets they reserve.
 //	@Tags			reservations
+//	@ID				api.getReservations
 //	@Produce		json
 //	@Success		200	{object}	models.ReservationsResponse	"List of reservations"
 //	@Failure		403	{object}	models.ErrorResponse		"Forbidden"
@@ -98,9 +99,10 @@ func GetReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // GetReservationByIDHandler returns a handler function that returns a single reservation.
 //
-//	@Summary		Get a reservation by ID (admin/owner only)
+//	@Summary		Get a reservation by ID (admin/owner only).
 //	@Description	Retrieve a single reservation, including their details and tickets they reserve.
 //	@Tags			reservations
+//	@ID				api.getReservationsByID
 //	@Produce		json
 //	@Param			id	path		string						true	"Reservation ID"
 //	@Success		200	{object}	models.ReservationResponse	"Reservation details"
@@ -182,9 +184,10 @@ func GetReservationByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // GetCurrentUserReservationsHandler lists all reservations for currently logged in user.
 //
-//	@Summary		List user reservations for currently logged in user
+//	@Summary		List user reservations for currently logged in user.
 //	@Description	Retrieve a list of current user's reservations along with details and tickets they reserve.
 //	@Tags			reservations
+//	@ID				api.getReservationsForCurrentUser
 //	@Produce		json
 //	@Success		200	{object}	models.ReservationsResponse	"List of reservations for the user"
 //	@Failure		400	{object}	models.ErrorResponse		"Bad Request"
@@ -292,9 +295,10 @@ func GetCurrentUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // GetCurrentUserReservationsTicketsHandler lists all tickets for currently logged in user.
 //
-//	@Summary		List user tickets for currently logged in user
+//	@Summary		List user tickets for currently logged in user.
 //	@Description	Retrieve a list of current user's tickets.
 //	@Tags			reservations
+//	@ID				api.getReservationTicketsForCurrentUser
 //	@Produce		json
 //	@Param			id	path		string						true	"User ID"
 //	@Success		200	{object}	models.UserTicketsResponse	"List of tickets belonging to the user"
@@ -392,6 +396,7 @@ func GetCurrentUserReservationsTicketsHandler(pool *pgxpool.Pool) http.HandlerFu
 //	@Summary		List user reservations (admin/owner only)
 //	@Description	Retrieve a list of all reservations made by a specific user, including their details and tickets they reserve.
 //	@Tags			reservations
+//	@ID				api.getReservationsForUserByID
 //	@Produce		json
 //	@Param			user_id	query		int							true	"User ID"
 //	@Success		200		{object}	models.ReservationsResponse	"List of reservations for the user"
@@ -495,11 +500,12 @@ func GetUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // GetUserReservationsTicketsHandler returns all tickets for a specific user.
 //
-//	@Summary		List user tickets (admin/owner only)
+//	@Summary		List user tickets (admin/owner only).
 //	@Description	Retrieve a list of user's tickets.
 //	@Tags			reservations
+//	@ID				api.getReservationTicketsForUserByID
 //	@Produce		json
-//	@Param			id	path		string					true	"User ID"
+//	@Param			id	path		string						true	"User ID"
 //	@Success		200	{object}	models.UserTicketsResponse	"List of tickets belonging to the user"
 //	@Failure		400	{object}	models.ErrorResponse		"Bad Request"
 //	@Failure		404	{object}	models.ErrorResponse		"Not Found"
@@ -593,9 +599,10 @@ func GetUserReservationsTicketsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // GetReservationTicketsHandler lists all tickets for a specific reservation.
 //
-//	@Summary		List tickets for a reservation (owner/admin only)
+//	@Summary		List tickets attributed to given reservation (owner/admin only).
 //	@Description	Retrieve all tickets associated with a specific reservation by its ID.
 //	@Tags			reservations
+//	@ID				api.getReservationTicketsByID
 //	@Produce		json
 //	@Param			id	path		int									true	"Reservation ID"
 //	@Success		200	{object}	models.ReservationTicketsResponse	"List of tickets for the reservation"
@@ -714,9 +721,10 @@ func GetReservationTicketsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // CreateReservationHandler creates a single reservation in the database along with its tickets.
 //
-//	@Summary		Create a reservation (owner/admin only)
+//	@Summary		Create a reservation (owner/admin only).
 //	@Description	Parse provided payload and create reservation and tickets within the database.
 //	@Tags			reservations
+//	@ID				api.createReservation
 //	@Produce		json
 //	@Param			body	body		models.CreateReservationPayload		true	"Payload to create a reservation"
 //	@Success		200		{object}	models.SuccessResponseCreateUUID	"Reservation created successfully"
@@ -897,9 +905,10 @@ func CreateReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // CancelReservationHandler updates the status of the reservation and its tickets to CANCELLED.
 //
-//	@Summary		Cancel a reservation (owner/admin only)
+//	@Summary		Cancel a reservation (owner/admin only).
 //	@Description	Set statuses of reservation and its tickets to cancelled.
 //	@Tags			reservations
+//	@ID				api.cancelReservation
 //	@Produce		json
 //	@Param			id	path		string					true	"Reservation ID"
 //	@Success		200	{object}	models.SuccessResponse	"Reservation canceled successfully"
@@ -977,9 +986,10 @@ func CancelReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // DeleteReservationHandler deletes a single reservation along with its tickets.
 //
-//	@Summary		Delete a reservation by ID (admin only)
+//	@Summary		Delete a reservation by ID (admin only).
 //	@Description	Delete a single reservation along with its tickets from the database.
 //	@Tags			reservations
+//	@ID				api.deleteReservation
 //	@Produce		json
 //	@Param			id	path		string					true	"Reservation ID"
 //	@Success		200	{object}	models.SuccessResponse	"Reservation deleted successfully"

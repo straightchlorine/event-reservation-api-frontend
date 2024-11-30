@@ -16,6 +16,15 @@ import (
 	"event-reservation-api/models"
 )
 
+func parseIdFromURL(r *http.Request, message string) (string, error) {
+	vars := mux.Vars(r)
+	id, ok := vars["id"]
+	if !ok {
+		return "", fmt.Errorf(message)
+	}
+	return id, nil
+}
+
 // Parse reservation ID from the URL.
 func parseReservationIdFromURL(r *http.Request) (string, error) {
 	vars := mux.Vars(r)

@@ -15,9 +15,10 @@ import (
 
 // GetUserHandler lists all users.
 //
-//	@Summary		List all users (admin only)
+//	@Summary		List all users (admin only).
 //	@Description	Retrieve a list of all users, including their details and roles.
 //	@Tags			users
+//	@ID				api.getUsers
 //	@Produce		json
 //	@Success		200	{object}	models.UsersResponse	"List of users"
 //	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
@@ -75,9 +76,10 @@ func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // GetUserByIDHandler returns a single user by ID.
 //
-//	@Summary		Get a user by ID (admin only)
+//	@Summary		Get a user by ID (admin only).
 //	@Description	Retrieve a user, including its details and roles.
 //	@Tags			users
+//	@ID				api.getUsersByID
 //	@Produce		json
 //	@Param			id	path		string					true	"User ID"
 //	@Success		200	{object}	models.UserResponse		"User details"
@@ -132,9 +134,10 @@ func GetUserByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // CreateUserHandler creates a single user in the database.
 //
-//	@Summary		Create a new user.
-//	@Description	Retrieve a user, including its details and roles.
+//	@Summary		Create a new user (open to create a user with registered role).
+//	@Description	Create a user with registered role based on provided payload. Request to create an admin user made by user without already admin status will be rejected.
 //	@Tags			users
+//	@ID				api.createUser
 //	@Produce		json
 //	@Success		200	{object}	models.SuccessResponseCreateUUID	"User details"
 //	@Failure		403	{object}	models.ErrorResponse				"Forbidden"
@@ -217,6 +220,7 @@ func CreateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Summary		Update user.
 //	@Description	Update user details (only owner/admin).
 //	@Tags			users
+//	@ID				api.updateUser
 //	@Param			id	path		string					true	"User ID"
 //	@Success		200	{object}	models.SuccessResponse	"User updated successfully"
 //	@Failure		403	{object}	models.ErrorResponse	"Forbidden"
@@ -340,8 +344,8 @@ func UpdateUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // DeleteUserHandler deletes specified user
 //
-//	@Summary		Delete user.
-//	@Description	Deletes user from the database (only owner/admin).
+//	@Summary		Delete user (admin/owner only).
+//	@Description	Deletes user from the database.
 //	@Tags			users
 //	@Param			id	path		string					true	"User ID"
 //	@Success		200	{object}	models.SuccessResponse	"User details"

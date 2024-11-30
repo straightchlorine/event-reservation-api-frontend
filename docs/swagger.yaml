@@ -375,7 +375,9 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.ErrorResponse'
-      summary: Create a new event.
+      security:
+      - BearerAuth: []
+      summary: Create a new event (admin only).
       tags:
       - events
   /events/{id}:
@@ -403,7 +405,9 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.ErrorResponse'
-      summary: Delete an existing event
+      security:
+      - BearerAuth: []
+      summary: Delete an existing event (admin only).
       tags:
       - events
     get:
@@ -473,7 +477,9 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.ErrorResponse'
-      summary: Update an existing event
+      security:
+      - BearerAuth: []
+      summary: Update an existing event (admin only).
       tags:
       - events
   /locations:
@@ -495,7 +501,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.ErrorResponse'
-      summary: Get all locations
+      summary: Get all locations.
       tags:
       - locations
     put:
@@ -529,7 +535,9 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.ErrorResponse'
-      summary: Create a new location.
+      security:
+      - BearerAuth: []
+      summary: Create a new location (admin only).
       tags:
       - locations
   /locations/{id}:
@@ -557,12 +565,14 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.ErrorResponse'
-      summary: Delete an existing location
+      security:
+      - BearerAuth: []
+      summary: Delete an existing location (admin only).
       tags:
       - locations
     get:
       description: Retrieve a single location by ID.
-      operationId: api.getLocation
+      operationId: api.getLocationByID
       parameters:
       - description: Location ID
         in: path
@@ -627,7 +637,9 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.ErrorResponse'
-      summary: Update an existing location
+      security:
+      - BearerAuth: []
+      summary: Update an existing location (admin only).
       tags:
       - locations
   /login:
@@ -693,6 +705,7 @@ paths:
     get:
       description: Retrieve a list of all reservations, including their details and
         tickets they reserve.
+      operationId: api.getReservations
       produces:
       - application/json
       responses:
@@ -714,12 +727,13 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List all reservations (admin only)
+      summary: List all reservations (admin only).
       tags:
       - reservations
     put:
       description: Parse provided payload and create reservation and tickets within
         the database.
+      operationId: api.createReservation
       parameters:
       - description: Payload to create a reservation
         in: body
@@ -748,12 +762,19 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Create a reservation (owner/admin only)
+      summary: Create a reservation (owner/admin only).
       tags:
       - reservations
   /reservations/{id}:
     delete:
       description: Delete a single reservation along with its tickets from the database.
+      operationId: api.deleteReservation
+      parameters:
+      - description: Reservation ID
+        in: path
+        name: id
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -775,12 +796,13 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Delete a reservation by ID (admin only)
+      summary: Delete a reservation by ID (admin only).
       tags:
       - reservations
     get:
       description: Retrieve a single reservation, including their details and tickets
         they reserve.
+      operationId: api.getReservationsByID
       parameters:
       - description: Reservation ID
         in: path
@@ -808,12 +830,13 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get a reservation by ID (admin/owner only)
+      summary: Get a reservation by ID (admin/owner only).
       tags:
       - reservations
   /reservations/{id}/cancel:
     post:
       description: Set statuses of reservation and its tickets to cancelled.
+      operationId: api.cancelReservation
       parameters:
       - description: Reservation ID
         in: path
@@ -841,13 +864,14 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Cancel a reservation (owner/admin only)
+      summary: Cancel a reservation (owner/admin only).
       tags:
       - reservations
   /reservations/{id}/tickets:
     get:
       description: Retrieve all tickets associated with a specific reservation by
         its ID.
+      operationId: api.getReservationTicketsByID
       parameters:
       - description: Reservation ID
         in: path
@@ -875,13 +899,14 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List tickets for a reservation (owner/admin only)
+      summary: List tickets attributed to given reservation (owner/admin only).
       tags:
       - reservations
   /reservations/user:
     get:
       description: Retrieve a list of current user's reservations along with details
         and tickets they reserve.
+      operationId: api.getReservationsForCurrentUser
       produces:
       - application/json
       responses:
@@ -903,13 +928,14 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List user reservations for currently logged in user
+      summary: List user reservations for currently logged in user.
       tags:
       - reservations
   /reservations/user/{id}:
     get:
       description: Retrieve a list of all reservations made by a specific user, including
         their details and tickets they reserve.
+      operationId: api.getReservationsForUserByID
       parameters:
       - description: User ID
         in: query
@@ -943,33 +969,7 @@ paths:
   /reservations/user/{id}/tickets:
     get:
       description: Retrieve a list of user's tickets.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: List of tickets belonging to the user
-          schema:
-            $ref: '#/definitions/models.UserTicketsResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: List user tickets (admin/owner only)
-      tags:
-      - reservations
-  /reservations/user/tickets:
-    get:
-      description: Retrieve a list of current user's tickets.
+      operationId: api.getReservationTicketsForUserByID
       parameters:
       - description: User ID
         in: path
@@ -997,12 +997,47 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List user tickets for currently logged in user
+      summary: List user tickets (admin/owner only).
+      tags:
+      - reservations
+  /reservations/user/tickets:
+    get:
+      description: Retrieve a list of current user's tickets.
+      operationId: api.getReservationTicketsForCurrentUser
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of tickets belonging to the user
+          schema:
+            $ref: '#/definitions/models.UserTicketsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List user tickets for currently logged in user.
       tags:
       - reservations
   /users:
     get:
       description: Retrieve a list of all users, including their details and roles.
+      operationId: api.getUsers
       produces:
       - application/json
       responses:
@@ -1024,11 +1059,14 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List all users (admin only)
+      summary: List all users (admin only).
       tags:
       - users
     put:
-      description: Retrieve a user, including its details and roles.
+      description: Create a user with registered role based on provided payload. Request
+        to create an admin user made by user without already admin status will be
+        rejected.
+      operationId: api.createUser
       produces:
       - application/json
       responses:
@@ -1050,12 +1088,12 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Create a new user.
+      summary: Create a new user (open to create a user with registered role).
       tags:
       - users
   /users/{id}:
     delete:
-      description: Deletes user from the database (only owner/admin).
+      description: Deletes user from the database.
       parameters:
       - description: User ID
         in: path
@@ -1081,11 +1119,12 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Delete user.
+      summary: Delete user (admin/owner only).
       tags:
       - users
     get:
       description: Retrieve a user, including its details and roles.
+      operationId: api.getUsersByID
       parameters:
       - description: User ID
         in: path
@@ -1113,11 +1152,12 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get a user by ID (admin only)
+      summary: Get a user by ID (admin only).
       tags:
       - users
     put:
       description: Update user details (only owner/admin).
+      operationId: api.updateUser
       parameters:
       - description: User ID
         in: path

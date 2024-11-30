@@ -15,7 +15,7 @@ import (
 
 // GetLocationsHandler lists all locations from the database
 //
-//	@Summary		Get all locations
+//	@Summary		Get all locations.
 //	@Description	Retrieve a list of all locations.
 //	@ID				api.getLocations
 //	@Tags			locations
@@ -79,7 +79,7 @@ func GetLocationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //
 //	@Summary		Retrieve a location.
 //	@Description	Retrieve a single location by ID.
-//	@ID				api.getLocation
+//	@ID				api.getLocationByID
 //	@Tags			locations
 //	@Produce		json
 //	@Param			id	path		string					true	"Location ID"
@@ -125,7 +125,7 @@ func GetLocationByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // CreateLocationHandler creates a single location in the database.
 //
-//	@Summary		Create a new location.
+//	@Summary		Create a new location (admin only).
 //	@Description	Parse the payload and create a new location with provided dataset.
 //	@ID				api.createLocation
 //	@Tags			locations
@@ -136,6 +136,7 @@ func GetLocationByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Failure		400		{object}	models.ErrorResponse			"Bad Request"
 //	@Failure		403		{object}	models.ErrorResponse			"Forbidden"
 //	@Failure		500		{object}	models.ErrorResponse			"Internal Server Error"
+//	@Security		BearerAuth
 //	@Router			/locations [put]
 func CreateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -198,7 +199,7 @@ func CreateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // UpdateLocationHandler updates an existing location by ID.
 //
-//	@Summary		Update an existing location
+//	@Summary		Update an existing location (admin only).
 //	@Description	Update location details based on the provided payload.
 //	@ID				api.updateLocation
 //	@Tags			locations
@@ -211,6 +212,7 @@ func CreateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Failure		403		{object}	models.ErrorResponse			"Forbidden"
 //	@Failure		422		{object}	models.ErrorResponse			"Unprocessable Entity"
 //	@Failure		500		{object}	models.ErrorResponse			"Internal Server Error"
+//	@Security		BearerAuth
 //	@Router			/locations/{id} [put]
 func UpdateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -289,7 +291,7 @@ func UpdateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // DeleteLocationHandler deletes an existing location by ID.
 //
-//	@Summary		Delete an existing location
+//	@Summary		Delete an existing location (admin only).
 //	@Description	Delete a location by its ID.
 //	@ID				api.deleteLocation
 //	@Tags			locations
@@ -298,6 +300,7 @@ func UpdateLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Success		200	{object}	models.SuccessResponseCreate	"Event deleted successfully"
 //	@Failure		400	{object}	models.ErrorResponse			"Bad Request"
 //	@Failure		500	{object}	models.ErrorResponse			"Internal Server Error"
+//	@Security		BearerAuth
 //	@Router			/locations/{id} [delete]
 func DeleteLocationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
