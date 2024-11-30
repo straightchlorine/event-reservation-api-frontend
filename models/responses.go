@@ -73,6 +73,14 @@ type UserResponse struct {
 	IsActive  bool      `json:"is_active"`
 }
 
+// Ticket, as its returned to user
+type TicketResponse struct {
+	ID     string  `json:"id"`
+	Type   string  `json:"type"`
+	Price  float64 `json:"price"`
+	Status string  `json:"status"`
+}
+
 type ReservationResponse struct {
 	ID           string           `json:"id"`
 	Username     string           `json:"user"`
@@ -81,4 +89,10 @@ type ReservationResponse struct {
 	Status       string           `json:"status"`
 	Event        EventResponse    `json:"event"`
 	Tickets      []TicketResponse `json:"tickets"`
+}
+
+type ReservationTicketsResponse struct {
+	ReservationID string           `json:"reservation_id"`
+	UserID        string           `json:"user"`
+	Tickets       []TicketResponse `json:"tickets"`
 }
