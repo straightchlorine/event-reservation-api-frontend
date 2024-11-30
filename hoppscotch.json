@@ -54,7 +54,7 @@
               "authActive": true
             },
             "preRequestScript": "",
-            "testScript": "const jsonData = pw.response.body;\npw.env.set(\"createdUser\", jsonData.userId);",
+            "testScript": "const jsonData = pw.response.body;\npw.env.set(\"createdUser\", jsonData.id);",
             "body": {
               "contentType": "application/ld+json",
               "body": "{\n  \"name\": \"createdName\",\n  \"surname\": \"createdSurname\",\n  \"username\": \"createdUsername\",\n  \"email\": \"created@user.usr\",\n  \"password\": \"password\",\n  \"role_name\": \"UNREGISTERED\",\n  \"is_active\": true\n}\n"
@@ -166,33 +166,6 @@
             "body": {
               "contentType": "application/ld+json",
               "body": "{\n  \"name\": \"createdName\",\n  \"surname\": \"createdSurname\",\n  \"username\": \"root\",\n  \"email\": \"created@user.usr\",\n  \"password\": \"root\",\n  \"role_name\": \"UNREGISTERED\",\n  \"is_active\": true\n}\n"
-            },
-            "requestVariables": [],
-            "responses": {}
-          },
-          {
-            "v": "8",
-            "endpoint": "http://localhost:8080/api/users/<<createdUser>>",
-            "name": "update user (duplicate username)",
-            "params": [],
-            "headers": [
-              {
-                "key": "Authorization",
-                "value": "Bearer <<jwtToken>>",
-                "active": true,
-                "description": ""
-              }
-            ],
-            "method": "PUT",
-            "auth": {
-              "authType": "inherit",
-              "authActive": true
-            },
-            "preRequestScript": "",
-            "testScript": "",
-            "body": {
-              "contentType": "application/json",
-              "body": "{\n  \"name\": \"updatedName\",\n  \"surname\": \"updatedSurname\",\n  \"username\": \"updatedUsername\",\n  \"email\": \"updated@email.up\",\n  \"role_name\": \"unregistered\",\n  \"is_active\": true\n}\n"
             },
             "requestVariables": [],
             "responses": {}
@@ -429,7 +402,7 @@
               "authActive": true
             },
             "preRequestScript": "",
-            "testScript": "const jsonData = pw.response.body;\npw.env.set(\"createdReservation\", jsonData.reservation_id);",
+            "testScript": "const jsonData = pw.response.body;\npw.env.set(\"createdReservation\", jsonData.id);",
             "body": {
               "contentType": "application/json",
               "body": "{\n  \"event_id\": 5,\n  \"tickets\": [\n    {\n      \"type\": \"STANDARD\"\n    },\n    {\n      \"type\": \"STUDENT\"\n    },\n    {\n      \"type\": \"SENIOR\"\n    }\n  ]\n}\n"
@@ -478,6 +451,168 @@
               }
             ],
             "method": "GET",
+            "auth": {
+              "authType": "inherit",
+              "authActive": true
+            },
+            "preRequestScript": "",
+            "testScript": "",
+            "body": {
+              "contentType": null,
+              "body": "{\n  \"primary_user_id\": 1,\n  \"event_id\": 1,\n  \"total_tickets\": 1,\n  \"tickets\": [\n    {\n      \"type\": \"STANDARD\"\n    }\n  ]\n}\n"
+            },
+            "requestVariables": [],
+            "responses": {}
+          },
+          {
+            "v": "8",
+            "endpoint": "http://localhost:8080/api/reservations/<<createdReservation>>/tickets",
+            "name": "reservations' tickets",
+            "params": [],
+            "headers": [
+              {
+                "key": "Authorization",
+                "value": "Bearer <<jwtToken>>",
+                "active": true,
+                "description": ""
+              }
+            ],
+            "method": "GET",
+            "auth": {
+              "authType": "inherit",
+              "authActive": true
+            },
+            "preRequestScript": "",
+            "testScript": "",
+            "body": {
+              "contentType": null,
+              "body": "{\n  \"primary_user_id\": 1,\n  \"event_id\": 1,\n  \"total_tickets\": 1,\n  \"tickets\": [\n    {\n      \"type\": \"STANDARD\"\n    }\n  ]\n}\n"
+            },
+            "requestVariables": [],
+            "responses": {}
+          },
+          {
+            "v": "8",
+            "endpoint": "http://localhost:8080/api/reservations/user",
+            "name": "current user's reservations",
+            "params": [],
+            "headers": [
+              {
+                "key": "Authorization",
+                "value": "Bearer <<jwtToken>>",
+                "active": true,
+                "description": ""
+              }
+            ],
+            "method": "GET",
+            "auth": {
+              "authType": "inherit",
+              "authActive": true
+            },
+            "preRequestScript": "",
+            "testScript": "",
+            "body": {
+              "contentType": null,
+              "body": "{\n  \"primary_user_id\": 1,\n  \"event_id\": 1,\n  \"total_tickets\": 1,\n  \"tickets\": [\n    {\n      \"type\": \"STANDARD\"\n    }\n  ]\n}\n"
+            },
+            "requestVariables": [],
+            "responses": {}
+          },
+          {
+            "v": "8",
+            "endpoint": "http://localhost:8080/api/reservations/user/tickets",
+            "name": "current user's tickets",
+            "params": [],
+            "headers": [
+              {
+                "key": "Authorization",
+                "value": "Bearer <<jwtToken>>",
+                "active": true,
+                "description": ""
+              }
+            ],
+            "method": "GET",
+            "auth": {
+              "authType": "inherit",
+              "authActive": true
+            },
+            "preRequestScript": "",
+            "testScript": "",
+            "body": {
+              "contentType": null,
+              "body": "{\n  \"primary_user_id\": 1,\n  \"event_id\": 1,\n  \"total_tickets\": 1,\n  \"tickets\": [\n    {\n      \"type\": \"STANDARD\"\n    }\n  ]\n}\n"
+            },
+            "requestVariables": [],
+            "responses": {}
+          },
+          {
+            "v": "8",
+            "endpoint": "http://localhost:8080/api/reservations/user/<<loggedUserID>>",
+            "name": "user's reservations by user id",
+            "params": [],
+            "headers": [
+              {
+                "key": "Authorization",
+                "value": "Bearer <<jwtToken>>",
+                "active": true,
+                "description": ""
+              }
+            ],
+            "method": "GET",
+            "auth": {
+              "authType": "inherit",
+              "authActive": true
+            },
+            "preRequestScript": "",
+            "testScript": "",
+            "body": {
+              "contentType": null,
+              "body": "{\n  \"primary_user_id\": 1,\n  \"event_id\": 1,\n  \"total_tickets\": 1,\n  \"tickets\": [\n    {\n      \"type\": \"STANDARD\"\n    }\n  ]\n}\n"
+            },
+            "requestVariables": [],
+            "responses": {}
+          },
+          {
+            "v": "8",
+            "endpoint": "http://localhost:8080/api/reservations/user/<<loggedUserID>>/tickets",
+            "name": "user's tickets by user id",
+            "params": [],
+            "headers": [
+              {
+                "key": "Authorization",
+                "value": "Bearer <<jwtToken>>",
+                "active": true,
+                "description": ""
+              }
+            ],
+            "method": "GET",
+            "auth": {
+              "authType": "inherit",
+              "authActive": true
+            },
+            "preRequestScript": "",
+            "testScript": "",
+            "body": {
+              "contentType": null,
+              "body": "{\n  \"primary_user_id\": 1,\n  \"event_id\": 1,\n  \"total_tickets\": 1,\n  \"tickets\": [\n    {\n      \"type\": \"STANDARD\"\n    }\n  ]\n}\n"
+            },
+            "requestVariables": [],
+            "responses": {}
+          },
+          {
+            "v": "8",
+            "endpoint": "http://localhost:8080/api/reservations/<<createdReservation>>/cancel",
+            "name": "cancel reservation",
+            "params": [],
+            "headers": [
+              {
+                "key": "Authorization",
+                "value": "Bearer <<jwtToken>>",
+                "active": true,
+                "description": ""
+              }
+            ],
+            "method": "POST",
             "auth": {
               "authType": "inherit",
               "authActive": true
@@ -676,7 +811,7 @@
     "requests": [
       {
         "v": "8",
-        "endpoint": "http://localhost:8080/login",
+        "endpoint": "http://localhost:8080/api/login",
         "name": "login",
         "params": [],
         "headers": [],
@@ -686,7 +821,7 @@
           "authActive": true
         },
         "preRequestScript": "",
-        "testScript": "const jsonData = pw.response.body;\npw.env.set(\"jwtToken\", jsonData.token);",
+        "testScript": "const jsonData = pw.response.body;\npw.env.set(\"jwtToken\", jsonData.token);\npw.env.set(\"loggedUserID\", jsonData.user.id)",
         "body": {
           "contentType": "application/json",
           "body": "{\"username\":\"root\", \"password\":\"root\"}"
@@ -696,7 +831,7 @@
       },
       {
         "v": "8",
-        "endpoint": "http://localhost:8080/logout",
+        "endpoint": "http://localhost:8080/api/logout",
         "name": "logout",
         "params": [],
         "headers": [
