@@ -91,6 +91,10 @@ type ReservationResponse struct {
 	Tickets      []TicketResponse `json:"tickets"`
 }
 
+type ReservationsRespones struct {
+	Reservations []ReservationResponse `json:"reservations"`
+}
+
 type ReservationTicketsResponse struct {
 	ReservationID string           `json:"reservation_id"`
 	UserID        string           `json:"user"`

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -15,18 +16,48 @@ import (
 	"event-reservation-api/models"
 )
 
+// Parse reservation ID from the URL.
+func parseReservationIdFromURL(r *http.Request) (string, error) {
+	vars := mux.Vars(r)
+	userId, ok := vars["id"]
+	if !ok {
+		return "", fmt.Errorf("Reservation ID not provided in the URL.")
+	}
+	return userId, nil
+}
+
+// Parse user ID from the URL.
+func parseUserIdFromURL(r *http.Request) (string, error) {
+	vars := mux.Vars(r)
+	userId, ok := vars["id"]
+	if !ok {
+		return "", fmt.Errorf("User ID not provided in the URL.")
+	}
+	return userId, nil
+}
+
+// Confirm the status of the reservation.
+// This involves setting the reservation status to CONFIRMED and the ticket status to SOLD.
 func confirmReservation(
 	ctx context.Context,
 	tx pgx.Tx,
 	reservationId string,
 ) error {
-	err := updateReservationStatus(ctx, tx, reservationId, "CONFIRMED")
-	if err != nil {
+	if err := updateReservationStatus(
+		ctx,
+		tx,
+		reservationId,
+		"CONFIRMED",
+	); err != nil {
 		return fmt.Errorf("Failed to update reservation status: %w", err)
 	}
 
-	err = updateTicketsStatus(ctx, tx, reservationId, "SOLD")
-	if err != nil {
+	if err := updateTicketsStatus(
+		ctx,
+		tx,
+		reservationId,
+		"SOLD",
+	); err != nil {
 		return fmt.Errorf("Failed to update ticket status: %w", err)
 	}
 	return nil
@@ -49,9 +80,13 @@ func updateTicketsStatus(
 		)
 		WHERE reservation_id = $2
 	`
-	_, err := tx.Exec(ctx, query, status, resId)
-	if err != nil {
-		return fmt.Errorf("failed to update reservation status: %w", err)
+	if _, err := tx.Exec(
+		ctx,
+		query,
+		status,
+		resId,
+	); err != nil {
+		return fmt.Errorf("Failed to update reservation status")
 	}
 	return nil
 }
@@ -73,13 +108,18 @@ func updateReservationStatus(
 		)
 		WHERE id = $2
 	`
-	_, err := tx.Exec(ctx, query, status, resId)
-	if err != nil {
-		return fmt.Errorf("failed to update reservation status: %w", err)
+	if _, err := tx.Exec(
+		ctx,
+		query,
+		status,
+		resId,
+	); err != nil {
+		return fmt.Errorf("Failed to update reservation status.")
 	}
 	return nil
 }
 
+// Substract amount of reserved tickets from the event.
 func substractTicketsFromEvent(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -93,12 +133,14 @@ func substractTicketsFromEvent(
 	`
 	_, err := tx.Exec(ctx, query, eventID, tickets)
 	if err != nil {
-		return fmt.Errorf("Failed to update available tickets for event %d: %w", eventID, err)
+		return fmt.Errorf("Failed to update available tickets for the event.")
 	}
 
 	return nil
 }
 
+// Fetch the details required for creating a ticket.
+// This involves the discount, type and status IDs.
 func fetchTicketDetails(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -128,7 +170,6 @@ func fetchTicketDetails(
 }
 
 // Fetch the details required for creating a reservation.
-//
 // This involves base price, available tickets as well as the id of the
 // reservation status
 func fetchReservationDetails(
@@ -153,7 +194,7 @@ func fetchReservationDetails(
 	err := tx.QueryRow(r.Context(), query, eventID, status).
 		Scan(&basePrice, &availableTickets, &statusID)
 	if err != nil {
-		return 0.0, 0, 0, fmt.Errorf("Failed to fetch reservation details: %w", err)
+		return 0.0, 0, 0, fmt.Errorf("Failed to fetch reservation details")
 	}
 
 	return basePrice, availableTickets, statusID, nil
@@ -222,6 +263,7 @@ func getWhereClause(address *string, stadium *string) (string, []interface{}) {
 	return "WHERE " + strings.Join(conditions, " AND "), args
 }
 
+// Validate the location data.
 func validateAddressAndStadium(address *string, stadium *string) error {
 	if (address == nil || *address == "") && (stadium == nil || *stadium == "") {
 		return fmt.Errorf("insufficient location data: address or stadium must be provided")
@@ -229,6 +271,7 @@ func validateAddressAndStadium(address *string, stadium *string) error {
 	return nil
 }
 
+// Insert a new location into the database.
 func insertLocation(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -253,7 +296,7 @@ func insertLocation(
 	return locationID, nil
 }
 
-// Check if a location exists within the database, if it does not, insert it.
+// Check if a location exists within the database, if it does not, insert it and return its ID.
 func getLocationID(
 	r *http.Request, tx pgx.Tx,
 	address *string,
@@ -290,7 +333,7 @@ func getLocationID(
 	return locationID, nil
 }
 
-// Utilitity to convert a date string to RFC3339 format.
+// Convert a date string to RFC3339 format.
 func dateToRFC3339(date string) (string, error) {
 	const customDateFormat = "2006-01-02 15:04"
 	var parsedDate time.Time
@@ -310,7 +353,7 @@ func dateToRFC3339(date string) (string, error) {
 	return rfc3339Date, nil
 }
 
-// Utility function to handle JSON responses.
+// Write JSON content to the response body.
 func writeJSONResponse(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -319,7 +362,7 @@ func writeJSONResponse(w http.ResponseWriter, status int, data interface{}) {
 	}
 }
 
-// Utility function for error handling.
+// Write JSON error message to the response body.
 func writeErrorResponse(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -358,7 +401,7 @@ func isRegistered(r *http.Request) bool {
 	return ok && role == "REGISTERED"
 }
 
-// Verify if currently logged in user is the owner of the user.
+// Verify if currently logged in user is the owner of the resource.
 func isOwner(r *http.Request, userID string) bool {
 	claims, err := middlewares.GetClaimsFromContext(r.Context())
 	if err != nil {
@@ -382,7 +425,7 @@ func getUserIdFromContext(ctx context.Context) (string, error) {
 }
 
 // Fetch the role name associated with a given role ID.
-func FetchRole(ctx context.Context, pool *pgxpool.Pool, roleID int) (string, error) {
+func fetchRole(ctx context.Context, pool *pgxpool.Pool, roleID int) (string, error) {
 	var roleName string
 	query := "SELECT name FROM roles WHERE id = $1"
 	err := pool.QueryRow(ctx, query, roleID).Scan(&roleName)

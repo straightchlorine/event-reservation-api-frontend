@@ -2,23 +2,21 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"event-reservation-api/models"
 )
 
-// GetReservationHandler returns a handler function that lists all reservations.
+// GetReservationHandler lists all reservations.
 //
 //	@Summary		List all reservations (admin only)
 //	@Description	Retrieve a list of all reservations, including their details and tickets they reserve.
 //	@Tags			reservations
 //	@Produce		json
-//	@Success		200	{array}		models.ReservationResponse	"List of reservations"
+//	@Success		200	{array}		models.ReservationsResponse	"List of reservations"
 //	@Failure		403	{object}	models.ErrorResponse		"Forbidden"
 //	@Failure		404	{object}	models.ErrorResponse		"Not Found"
 //	@Failure		500	{object}	models.ErrorResponse		"Internal Server Error"
@@ -42,6 +40,10 @@ func GetReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		`
 		rows, err := pool.Query(r.Context(), query)
 		if err != nil {
+			if err == pgx.ErrNoRows {
+				writeErrorResponse(w, http.StatusNotFound, "Reservations not found.")
+				return
+			}
 			writeErrorResponse(
 				w,
 				http.StatusInternalServerError,
@@ -63,10 +65,6 @@ func GetReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				&event.ID, &event.Name, &event.Date,
 				&location.Country, &location.Address, &location.Stadium,
 			); err != nil {
-				if err == pgx.ErrNoRows {
-					writeErrorResponse(w, http.StatusNotFound, "Reservations not found.")
-					return
-				}
 				writeErrorResponse(
 					w,
 					http.StatusInternalServerError,
@@ -93,13 +91,14 @@ func GetReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			res.Tickets = tickets
 			reservations = append(reservations, res)
 		}
-		writeJSONResponse(w, http.StatusOK, reservations)
+		reservations_response := models.ReservationsRespones{Reservations: reservations}
+		writeJSONResponse(w, http.StatusOK, reservations_response)
 	}
 }
 
 // GetReservationByIDHandler returns a handler function that returns a single reservation.
 //
-//	@Summary		Get a reservation by ID (admin only)
+//	@Summary		Get a reservation by ID (admin/owner only)
 //	@Description	Retrieve a single reservation, including their details and tickets they reserve.
 //	@Tags			reservations
 //	@Produce		json
@@ -108,10 +107,22 @@ func GetReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Failure		404	{object}	models.ErrorResponse		"Not Found"
 //	@Failure		500	{object}	models.ErrorResponse		"Internal Server Error"
 //	@Security		BearerAuth
-//	@Router			/reservations{id} [get]
+//	@Router			/reservations/{id} [get]
 func GetReservationByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !isAdmin(r) {
+		// get the user id
+		userId, err := getUserIdFromContext(r.Context())
+		if err != nil {
+			writeErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				"Failed to fetch the user identifier.",
+			)
+			return
+		}
+
+		// permissions
+		if !isAdmin(r) && !isOwner(r, userId) {
 			writeErrorResponse(w, http.StatusForbidden, "Insufficient permissions.")
 			return
 		}
@@ -148,7 +159,7 @@ func GetReservationByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			&location.Address,
 			&location.Stadium,
 		); err != nil {
-			writeErrorResponse(w, http.StatusNotFound, "Reservation not found")
+			writeErrorResponse(w, http.StatusNotFound, "Reservation not found.")
 			return
 		}
 
@@ -174,7 +185,7 @@ func GetReservationByIDHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Description	Retrieve a list of current user's reservations along with  details and tickets they reserve.
 //	@Tags			reservations
 //	@Produce		json
-//	@Success		200	{array}		models.ReservationResponse	"List of reservations for the user"
+//	@Success		200	{array}		models.ReservationsResponse	"List of reservations for the user"
 //	@Failure		400	{object}	models.ErrorResponse		"Bad Request"
 //	@Failure		404	{object}	models.ErrorResponse		"Not Found"
 //	@Failure		500	{object}	models.ErrorResponse		"Internal Server Error"
@@ -188,12 +199,11 @@ func GetCurrentUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			writeErrorResponse(
 				w,
 				http.StatusInternalServerError,
-				"Failed to fetch the user identifier.",
+				"Failed to fetch the user id.",
 			)
 			return
 		}
 
-		print(userID)
 		query := `
 			SELECT r.id, u.username, r.created_at, r.total_tickets, rs.name,
 				e.id, e.name, e.date, l.country, l.address, l.stadium
@@ -274,14 +284,14 @@ func GetCurrentUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-// GetUserReservationsHandler returns a handler function that lists all reservations for a specific user.
+// GetUserReservationsHandler returns all reservations for a specific user.
 //
-//	@Summary		List user reservations (admin only)
+//	@Summary		List user reservations (admin/owner only)
 //	@Description	Retrieve a list of all reservations made by a specific user, including their details and tickets they reserve.
 //	@Tags			reservations
 //	@Produce		json
 //	@Param			user_id	query		int							true	"User ID"
-//	@Success		200		{array}		models.ReservationResponse	"List of reservations for the user"
+//	@Success		200		{array}		models.ReservationsResponse	"List of reservations for the user"
 //	@Failure		400		{object}	models.ErrorResponse		"Bad Request"
 //	@Failure		404		{object}	models.ErrorResponse		"Not Found"
 //	@Failure		500		{object}	models.ErrorResponse		"Internal Server Error"
@@ -289,18 +299,23 @@ func GetCurrentUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 //	@Router			/reservations/user/{id} [get]
 func GetUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !isAdmin(r) {
+		// get the user id
+		userId, err := getUserIdFromContext(r.Context())
+		if err != nil {
+			writeErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				"Failed to fetch the user identifier.",
+			)
+			return
+		}
+
+		// permissions
+		if !isAdmin(r) && !isOwner(r, userId) {
 			writeErrorResponse(w, http.StatusForbidden, "Insufficient permissions.")
 			return
 		}
 
-		// parse id from URL
-		vars := mux.Vars(r)
-		userID, ok := vars["id"]
-		if !ok {
-			writeErrorResponse(w, http.StatusBadRequest, "User ID not provided in the URL.")
-			return
-		}
 		query := `
 			SELECT r.id, u.username, r.created_at, r.total_tickets, rs.name,
 				e.id, e.name, e.date, l.country, l.address, l.stadium
@@ -311,7 +326,7 @@ func GetUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			JOIN Locations l ON e.location_id = l.id
 			WHERE r.user_id = $1
 		`
-		rows, err := pool.Query(r.Context(), query, userID)
+		rows, err := pool.Query(r.Context(), query, userId)
 		if err != nil {
 			writeErrorResponse(
 				w,
@@ -370,13 +385,14 @@ func GetUserReservationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		writeJSONResponse(w, http.StatusOK, reservations)
+		reservations_response := models.ReservationsRespones{Reservations: reservations}
+		writeJSONResponse(w, http.StatusOK, reservations_response)
 	}
 }
 
 // GetReservationTicketsHandler lists all tickets for a specific reservation.
 //
-//	@Summary		List tickets for a reservation
+//	@Summary		List tickets for a reservation (owner/admin only)
 //	@Description	Retrieve all tickets associated with a specific reservation by its ID.
 //	@Tags			reservatons
 //	@Produce		json
@@ -497,7 +513,7 @@ func GetReservationTicketsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // CreateReservationHandler creates a single reservation in the database along with its tickets.
 //
-//	@Summary		Create a reservation (registered/admin only)
+//	@Summary		Create a reservation (owner/admin only)
 //	@Description	Parse provided payload and create reservation and tickets within the database.
 //	@Tags			reservations
 //	@Produce		json
@@ -764,14 +780,4 @@ func DeleteReservationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			models.SuccessResponse{Message: "Reservation deleted successfully."},
 		)
 	}
-}
-
-// Parse reservation ID from the URL.
-func parseReservationIdFromURL(r *http.Request) (string, error) {
-	vars := mux.Vars(r)
-	userId, ok := vars["id"]
-	if !ok {
-		return "", fmt.Errorf("Reservation ID not provided in the URL.")
-	}
-	return userId, nil
 }
