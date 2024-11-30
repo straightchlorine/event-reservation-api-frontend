@@ -73,6 +73,10 @@ type UserResponse struct {
 	IsActive  bool      `json:"is_active"`
 }
 
+type UsersResponse struct {
+	Users []UserResponse `json:"users"`
+}
+
 // Ticket, as its returned to user
 type TicketResponse struct {
 	ID     string  `json:"id"`

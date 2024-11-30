@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
@@ -69,7 +68,8 @@ func GetUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 			users = append(users, user)
 		}
-		writeJSONResponse(w, http.StatusOK, users)
+		users_response := models.UsersResponse{Users: users}
+		writeJSONResponse(w, http.StatusOK, users_response)
 	}
 }
 
@@ -386,14 +386,4 @@ func DeleteUserHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			models.SuccessResponse{Message: "User deleted successfully"},
 		)
 	}
-}
-
-// Parse user ID from the URL.
-func parseUserIdFromURL(r *http.Request) (string, error) {
-	vars := mux.Vars(r)
-	userId, ok := vars["id"]
-	if !ok {
-		return "", fmt.Errorf("User ID not provided in the URL.")
-	}
-	return userId, nil
 }
