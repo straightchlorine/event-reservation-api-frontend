@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gorilla/handlers"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -45,9 +46,9 @@ func populateDatabase(populateFlag *bool, pool *pgxpool.Pool) {
 //	@host		localhost:8080
 //	@BasePath	/api/
 
-//	@securityDefinitions.apikey	BearerAuth
-//	@in							header
-//	@name						Authorization
+// @securityDefinitions.apikey	BearerAuth
+// @in							header
+// @name						Authorization
 func main() {
 	// Initialize the JWT secret.
 	jwtSecret := middlewares.InitJWTSecret()
@@ -75,11 +76,15 @@ func main() {
 		port = "8080"
 	}
 
+	// Enable CORS.
 	cors := handlers.CORS(
 		handlers.AllowedOrigins([]string{"*"}),
 		handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE"}),
 		handlers.AllowedHeaders([]string{"Content-Type", "Authorization"}),
 	)
+
+	// Start goroutine to clean up expired tokens.
+	middlewares.StartTokenCleanupTask(pool, time.Hour)
 
 	// Log the server start.
 	fmt.Printf("Server running on port %s\n", port)

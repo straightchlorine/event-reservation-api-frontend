@@ -3,8 +3,10 @@ package middlewares
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,6 +17,29 @@ type ContextKey string
 
 // JWT claims stored in the context
 const UserClaimsKey ContextKey = "userClaims"
+
+// Routine for token cleanup.
+func StartTokenCleanupTask(pool *pgxpool.Pool, interval time.Duration) {
+	go func() {
+		for {
+			time.Sleep(interval)
+			if err := DeleteExpiredTokens(pool); err != nil {
+				fmt.Printf("Error deleting expired tokens: %v\n", err)
+			}
+		}
+	}()
+}
+
+// Delete expire tokens from the blacklist.
+func DeleteExpiredTokens(pool *pgxpool.Pool) error {
+	log.Println("Deleting expired tokens...")
+	query := `DELETE FROM token_blacklist WHERE expires_at < $1`
+	_, err := pool.Exec(context.Background(), query, time.Now())
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func TokenValidation(
 	pool *pgxpool.Pool,
