@@ -137,9 +137,10 @@ func setAvailableTickets(
 ) error {
 	query := `
 		UPDATE events
-		SET available_tickets = $2
+		SET available_tickets = available_tickets - $2
 		WHERE id = $1
 	`
+
 	_, err := tx.Exec(ctx, query, eventID, tickets)
 	if err != nil {
 		return fmt.Errorf("Failed to update available tickets for the event.")
