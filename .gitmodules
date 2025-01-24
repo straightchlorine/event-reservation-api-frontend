@@ -1,0 +1,3 @@
+[submodule "event-reservation-frontend"]
+	path = event-reservation-frontend
+	url = https://github.com/straightchlorine/event-reservation-frontend
